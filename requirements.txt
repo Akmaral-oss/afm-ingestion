@@ -1,0 +1,11 @@
+pandas
+openpyxl
+numpy
+python-dateutil
+sqlalchemy
+psycopg2-binary
+rapidfuzz
+
+# optional:
+sentence-transformers
+torch
