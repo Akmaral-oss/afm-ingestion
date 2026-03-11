@@ -297,3 +297,6 @@ class KaspiAdapter(BankAdapter):
                 i += 1
 
         return out
+
+
+
