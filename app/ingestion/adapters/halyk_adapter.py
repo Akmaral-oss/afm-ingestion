@@ -24,29 +24,34 @@ class SimpleBlock:
 HALYK_HEADER_MARKERS = [
     "дата и время операции",
     "дата операции",
+    "дата операции время",
+    "дата операции / время",
     "дата/время",
+    "дата",
 ]
 
 
 class HalykAdapter(BankAdapter):
+
     bank_name = "halyk"
 
     def __init__(self):
         self.meta = StatementMetadataExtractor()
 
     def list_files(self, data_root: str) -> List[str]:
+
         path = os.path.join(data_root, "halyk")
+
         if not os.path.exists(path):
             return []
+
         return [
             os.path.join(path, f)
             for f in os.listdir(path)
             if f.lower().endswith(".xlsx")
         ]
 
-    def load_grid(self, path: str, sheet_name: str) -> List[List[Any]]:
-        wb = load_workbook(path, data_only=True, read_only=True)
-        ws = wb[sheet_name]
+    def load_grid(self, ws) -> List[List[Any]]:
 
         grid: List[List[Any]] = []
         max_col = ws.max_column
@@ -57,9 +62,11 @@ class HalykAdapter(BankAdapter):
         return grid
 
     def _row_join(self, row: List[Any]) -> str:
+
         return " ".join(norm_text(x) for x in row if x is not None)
 
     def _is_header_row(self, row: List[Any]) -> bool:
+
         joined = self._row_join(row)
 
         if not joined:
@@ -68,11 +75,13 @@ class HalykAdapter(BankAdapter):
         return any(marker in joined for marker in HALYK_HEADER_MARKERS)
 
     def _is_empty_row(self, row: List[Any]) -> bool:
+
         return all(norm_text(x) == "" for x in row)
 
     def _scan_end(self, grid: List[List[Any]], start_idx: int) -> int:
 
         n = len(grid)
+
         empty_streak = 0
         last_data = start_idx - 1
 
@@ -80,7 +89,6 @@ class HalykAdapter(BankAdapter):
 
             row = grid[r]
 
-            # stop if next header found
             if self._is_header_row(row):
                 break
 
@@ -98,6 +106,7 @@ class HalykAdapter(BankAdapter):
     def _detect_blocks(self, grid: List[List[Any]], sheet_name: str) -> List[SimpleBlock]:
 
         blocks: List[SimpleBlock] = []
+
         i = 0
         n = len(grid)
 
@@ -107,9 +116,11 @@ class HalykAdapter(BankAdapter):
 
                 header_i = i
                 data_start = i + 1
+
                 data_end = self._scan_end(grid, data_start)
 
                 if data_end >= data_start:
+
                     blocks.append(
                         SimpleBlock(
                             sheet_name=sheet_name,
@@ -126,9 +137,30 @@ class HalykAdapter(BankAdapter):
 
         return blocks
 
+    def _unique_headers(self, headers: List[str]) -> List[str]:
+
+        seen = {}
+        out = []
+
+        for h in headers:
+
+            if not h:
+                h = "col"
+
+            if h not in seen:
+                seen[h] = 1
+                out.append(h)
+            else:
+                seen[h] += 1
+                out.append(f"{h}_{seen[h]}")
+
+        return out
+
     def _build_df(self, grid: List[List[Any]], block: SimpleBlock) -> pd.DataFrame:
 
         header = [norm_text(x) for x in grid[block.header_row_idx]]
+
+        header = self._unique_headers(header)
 
         data = grid[block.data_start_row_idx:block.data_end_row_idx + 1]
 
@@ -147,7 +179,9 @@ class HalykAdapter(BankAdapter):
 
         for sheet_name in wb.sheetnames:
 
-            grid = self.load_grid(file_path, sheet_name)
+            ws = wb[sheet_name]
+
+            grid = self.load_grid(ws)
 
             blocks = self._detect_blocks(grid, sheet_name)
 
@@ -173,8 +207,8 @@ class HalykAdapter(BankAdapter):
                     block=block,
                     source_bank=self.bank_name,
                     max_lookback_rows=30,
-                    max_lookahead_rows=0,
-                    tail_rows_in_block=0,
+                    max_lookahead_rows=30,
+                    tail_rows_in_block=30,
                 )
 
                 stmt_meta["source_sheet"] = sheet_name

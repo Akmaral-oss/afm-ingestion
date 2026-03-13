@@ -12,10 +12,16 @@ from app.utils.number_utils import parse_decimal
 
 _KZ_IBAN_RE = re.compile(r"\bKZ[A-Z0-9]{8,32}\b", re.IGNORECASE)
 _IIN_RE = re.compile(r"\b\d{12}\b")
+_HALYK_CONTRACT_RE = re.compile(r"\bCONTRACT\s*#?\s*(KZ[0-9A-Z]{10,40})\b", re.IGNORECASE)
+_CURRENCY_RE = re.compile(r"\b(KZT|USD|EUR|RUB|CNY)\b", re.IGNORECASE)
 
 FOOTER_PRIMARY = [
     "итого",
     "итого оборотов",
+    "итого по дебету",
+    "итого по кредиту",
+    "оборот по дебету",
+    "оборот по кредиту",
     "исходящий остаток",
     "входящий остаток",
 ]
@@ -23,6 +29,8 @@ FOOTER_PRIMARY = [
 HEADER_STOP_MARKERS = [
     "дата и время операции",
     "дата операции",
+    "дата операции время",
+    "дата операции / время",
     "дата/время",
 ]
 
@@ -100,18 +108,48 @@ def _money_score(x: float) -> float:
     return ax
 
 
+def _clean_text_value(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    s = str(v).strip()
+    if s in {"", "'", '"', "-", "—", "–", "''", '""'}:
+        return None
+    return s
+
+
 class StatementMetadataExtractor:
     def _detect_iban(self, text: str) -> Optional[str]:
+        # Halyk contract ids also start with KZ, so don't treat Contract rows as IBAN rows
+        if "contract" in text.lower():
+            return None
+
         s = re.sub(r"\s+", "", text.upper())
         m = _KZ_IBAN_RE.search(s)
-        if m:
-            return m.group(0)
+        if not m:
+            return None
+
+        iban = m.group(0)
+        # practical guard: IBAN usually >= 20 chars here
+        if len(iban) >= 20:
+            return iban
         return None
 
     def _detect_iin(self, text: str) -> Optional[str]:
         m = _IIN_RE.search(text)
         if m:
             return m.group(0)
+        return None
+
+    def _detect_contract(self, text: str) -> Optional[str]:
+        m = _HALYK_CONTRACT_RE.search(text)
+        if m:
+            return m.group(1)
+        return None
+
+    def _detect_currency(self, text: str) -> Optional[str]:
+        m = _CURRENCY_RE.search(str(text).upper())
+        if m:
+            return m.group(1).upper()
         return None
 
     def extract_for_block(
@@ -142,13 +180,10 @@ class StatementMetadataExtractor:
 
         def push_pair(k: str, v: Any):
             kk = norm_text(k)
-            if not kk:
+            vv = _clean_text_value(v)
+            if not kk or vv is None:
                 return
-            if v is None:
-                return
-            if str(v).strip() == "":
-                return
-            raw_pairs[kk] = v
+            raw_pairs[kk] = vv
 
         def set_best_money(k: str, v: Any):
             kk = norm_text(k)
@@ -169,17 +204,18 @@ class StatementMetadataExtractor:
         if source_bank == "kaspi":
             for i, row in enumerate(window_above):
                 cells = row[:10]
-                raw_lines.append(_row_text(cells))
+                txt = _row_text(cells)
+                raw_lines.append(txt)
 
-                c0 = str(cells[0]).strip() if len(cells) > 0 and cells[0] is not None else ""
-                c2 = str(cells[2]).strip() if len(cells) > 2 and cells[2] is not None else ""
+                c0 = _clean_text_value(cells[0] if len(cells) > 0 else None)
+                c1 = _clean_text_value(cells[1] if len(cells) > 1 else None)
+                c2 = _clean_text_value(cells[2] if len(cells) > 2 else None)
 
                 label = norm_text(c0)
-
                 next_row = window_above[i + 1] if i + 1 < len(window_above) else []
-                next_val = str(next_row[0]).strip() if next_row and next_row[0] is not None else ""
+                next_val = _clean_text_value(next_row[0] if next_row else None)
 
-                value = c2 if c2 else next_val
+                value = c2 or c1 or next_val
 
                 if label == "клиент":
                     push_pair("клиент", value)
@@ -208,8 +244,6 @@ class StatementMetadataExtractor:
                 elif "исходящий остаток" in label:
                     push_pair("closing_balance", value)
 
-                txt = _row_text(cells)
-
                 iban = self._detect_iban(txt)
                 if iban and "iban" not in raw_pairs:
                     push_pair("iban", iban)
@@ -219,24 +253,84 @@ class StatementMetadataExtractor:
                     push_pair("иин/бин", detected_iin)
 
         # =================================================
-        # GENERIC / HALYK-STYLE METADATA
+        # HALYK-SPECIFIC METADATA
+        # =================================================
+        elif source_bank == "halyk":
+            for row in window_above:
+                cells = row[:14]
+                txt = _row_text(cells)
+                raw_lines.append(txt)
+
+                c0 = _clean_text_value(cells[0] if len(cells) > 0 else None)
+                c1 = _clean_text_value(cells[1] if len(cells) > 1 else None)
+
+                # 1) Generic key:value
+                for c in cells:
+                    if c is None:
+                        continue
+                    s = str(c).strip()
+                    if ":" in s:
+                        k, v = s.split(":", 1)
+                        push_pair(k.strip(), v.strip())
+
+                # 2) Halyk client line:
+                # "ИИН/БИН 990124000000 | ДҮЙСЕКАКА А.Т."
+                if txt:
+                    detected_iin = self._detect_iin(txt)
+                    if detected_iin and ("иин/бин" in txt.lower() or "иин" in txt.lower() or "бин" in txt.lower()):
+                        push_pair("иин/бин", detected_iin)
+                        if c1:
+                            push_pair("клиент", c1)
+
+                # 3) Contract line
+                contract = self._detect_contract(txt)
+                if contract:
+                    push_pair("contract #", contract)
+
+                # 4) Contract currency
+                if "валюта контракта" in txt.lower():
+                    cur = self._detect_currency(txt)
+                    if cur:
+                        push_pair("валюта контракта", cur)
+
+                # 5) IBAN only if not contract line
+                iban = self._detect_iban(txt)
+                if iban and "iban" not in raw_pairs:
+                    push_pair("iban", iban)
+
+                # 6) right-side fallback for labels ending with :
+                for j in range(len(cells)):
+                    c_label = cells[j]
+                    if c_label is None:
+                        continue
+
+                    s0 = str(c_label).strip()
+                    if not s0.endswith(":"):
+                        continue
+
+                    for k in range(j + 1, min(len(cells), j + 6)):
+                        cv = cells[k]
+                        sv = _clean_text_value(cv)
+                        if sv:
+                            push_pair(s0.strip(" :"), sv)
+                            break
+
+        # =================================================
+        # GENERIC FALLBACK
         # =================================================
         else:
             for row in window_above:
                 cells = row[:14]
                 raw_lines.append(_row_text(cells))
 
-                # key:value
                 for c in cells:
                     if c is None:
                         continue
-
                     s = str(c).strip()
                     if ":" in s:
                         k, v = s.split(":", 1)
                         push_pair(k.strip(), v.strip())
 
-                # label → value right
                 for j in range(len(cells)):
                     c0 = cells[j]
                     if c0 is None:
@@ -248,10 +342,7 @@ class StatementMetadataExtractor:
 
                     for k in range(j + 1, min(len(cells), j + 6)):
                         cv = cells[k]
-                        if cv is None:
-                            continue
-
-                        sv = str(cv).strip()
+                        sv = _clean_text_value(cv)
                         if sv:
                             push_pair(s0.strip(" :"), sv)
                             break
@@ -281,7 +372,7 @@ class StatementMetadataExtractor:
 
                 if source_bank == "kaspi":
                     nums = _all_numbers(row)
-                    money_candidates = [n for n in nums if abs(n) >= 1000]
+                    money_candidates = nums
 
                     if "исходящий остаток" in joined and money_candidates:
                         set_best_money("closing_balance", max(money_candidates, key=abs))
@@ -378,12 +469,16 @@ class StatementMetadataExtractor:
                 "raw_pairs": raw_pairs,
                 "raw_lines": raw_lines[:300],
                 "source_bank_hint": source_bank,
+                "header_row_idx": block.header_row_idx,
+                "data_start_row_idx": block.data_start_row_idx,
+                "data_end_row_idx": block.data_end_row_idx,
+                "header_rows": block.header_rows,
             },
         }
 
         v_client = find_value(META_KEY_PATTERNS["client"])
         if v_client:
-            stmt["client_name"] = str(v_client)
+            stmt["client_name"] = str(v_client).strip()
 
         stmt["client_iin_bin"] = looks_like_iin_bin(find_value(META_KEY_PATTERNS["iin_bin"]))
         stmt["contract_no"] = find_value(["contract #"] + META_KEY_PATTERNS["contract"])
@@ -391,7 +486,7 @@ class StatementMetadataExtractor:
         v_acc = find_value(META_KEY_PATTERNS["account"]) or find_value(["iban"])
         stmt["account_iban"] = looks_like_iban(v_acc)
 
-        v_cur = find_value(META_KEY_PATTERNS["currency"])
+        v_cur = find_value(META_KEY_PATTERNS["currency"]) or raw_pairs.get("валюта контракта")
         if v_cur:
             stmt["currency"] = str(v_cur).upper()
 
