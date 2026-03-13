@@ -11,6 +11,7 @@ from app.utils.number_utils import parse_decimal
 
 
 _KZ_IBAN_RE = re.compile(r"\bKZ[A-Z0-9]{8,32}\b", re.IGNORECASE)
+_IIN_RE = re.compile(r"\b\d{12}\b")
 
 FOOTER_PRIMARY = [
     "итого",
@@ -25,10 +26,6 @@ HEADER_STOP_MARKERS = [
     "дата/время",
 ]
 
-
-# -----------------------------
-# utils
-# -----------------------------
 
 def _row_text(row: List[Any], max_cols: int = 32) -> str:
     out: List[str] = []
@@ -58,39 +55,30 @@ def _looks_like_header_row(row: List[Any]) -> bool:
 
 
 def _first_number_to_right(row: List[Any], needle: str, max_look: int = 12) -> Optional[float]:
-
     nrow = [norm_text(c) for c in row]
 
     for i, t in enumerate(nrow):
-
         if not t:
             continue
 
         if needle in t:
-
             for j in range(i + 1, min(len(row), i + 1 + max_look)):
-
                 v = parse_decimal(row[j])
-
                 if v is None:
                     continue
-
                 return float(v)
 
     return None
 
 
 def _all_numbers(row: List[Any], max_cols: int = 40) -> List[float]:
-
     vals: List[float] = []
 
     for c in row[:max_cols]:
-
         if c is None:
             continue
 
         v = parse_decimal(c)
-
         if v is None:
             continue
 
@@ -100,26 +88,31 @@ def _all_numbers(row: List[Any], max_cols: int = 40) -> List[float]:
 
 
 def _money_score(x: float) -> float:
-
     ax = abs(x)
 
     if ax >= 1_000_000:
         return ax + 10_000_000
-
     if ax >= 10_000:
         return ax + 1_000_000
-
     if ax >= 1_000:
         return ax + 100_000
 
     return ax
 
 
-# -------------------------------------------------------
-# MAIN METADATA EXTRACTOR
-# -------------------------------------------------------
-
 class StatementMetadataExtractor:
+    def _detect_iban(self, text: str) -> Optional[str]:
+        s = re.sub(r"\s+", "", text.upper())
+        m = _KZ_IBAN_RE.search(s)
+        if m:
+            return m.group(0)
+        return None
+
+    def _detect_iin(self, text: str) -> Optional[str]:
+        m = _IIN_RE.search(text)
+        if m:
+            return m.group(0)
+        return None
 
     def extract_for_block(
         self,
@@ -138,134 +131,146 @@ class StatementMetadataExtractor:
 
         footer_start = min(len(grid), block.data_end_row_idx + 1)
         footer_end = min(len(grid), footer_start + max_lookahead_rows)
-
         window_below_raw = grid[footer_start:footer_end]
 
         tail_start = max(block.data_start_row_idx, block.data_end_row_idx - tail_rows_in_block)
-
         window_tail = grid[tail_start:block.data_end_row_idx + 1]
 
         raw_pairs: Dict[str, Any] = {}
         raw_lines: List[str] = []
         best: Dict[str, Tuple[Any, float]] = {}
 
-        # --------------------------------
-        # metadata push
-        # --------------------------------
-
         def push_pair(k: str, v: Any):
-
             kk = norm_text(k)
-
             if not kk:
                 return
-
             if v is None:
                 return
-
             if str(v).strip() == "":
                 return
-
             raw_pairs[kk] = v
 
-        # --------------------------------
-        # totals selector
-        # --------------------------------
-
         def set_best_money(k: str, v: Any):
-
             kk = norm_text(k)
-
             if not kk or v is None:
                 return
 
             pv = parse_decimal(v)
-
             if pv is None:
                 return
 
             score = _money_score(float(pv))
-
             if kk not in best or score > best[kk][1]:
-
                 best[kk] = (pv, score)
 
-        # -------------------------------------------------
-        # ABOVE HEADER SCAN
-        # -------------------------------------------------
+        # =================================================
+        # KASPI-SPECIFIC METADATA
+        # =================================================
+        if source_bank == "kaspi":
+            for i, row in enumerate(window_above):
+                cells = row[:10]
+                raw_lines.append(_row_text(cells))
 
-        for row in window_above:
+                c0 = str(cells[0]).strip() if len(cells) > 0 and cells[0] is not None else ""
+                c2 = str(cells[2]).strip() if len(cells) > 2 and cells[2] is not None else ""
 
-            cells = row[:14]
+                label = norm_text(c0)
 
-            raw_lines.append(_row_text(cells))
+                next_row = window_above[i + 1] if i + 1 < len(window_above) else []
+                next_val = str(next_row[0]).strip() if next_row and next_row[0] is not None else ""
 
-            # key:value
+                value = c2 if c2 else next_val
 
-            for c in cells:
+                if label == "клиент":
+                    push_pair("клиент", value)
 
-                if c is None:
-                    continue
+                elif "иин" in label or "бин" in label:
+                    push_pair("иин/бин", value)
 
-                s = str(c).strip()
+                elif label == "период" or label.startswith("период"):
+                    push_pair("period", value)
 
-                if ":" in s:
+                elif "счет" in label and "валюта" not in label and "тип" not in label:
+                    push_pair("iban", value)
 
-                    k, v = s.split(":", 1)
+                elif "валюта счета" in label:
+                    push_pair("currency", value)
 
-                    push_pair(k.strip(), v.strip())
+                elif "тип счета" in label:
+                    push_pair("account_type", value)
 
-            # label → value right
+                elif "дата формирования" in label or "дата выписки" in label or "формирования" in label:
+                    push_pair("statement_date", value)
 
-            for j in range(len(cells)):
+                elif "входящий остаток" in label:
+                    push_pair("opening_balance", value)
 
-                c0 = cells[j]
+                elif "исходящий остаток" in label:
+                    push_pair("closing_balance", value)
 
-                if c0 is None:
-                    continue
+                txt = _row_text(cells)
 
-                s0 = str(c0).strip()
+                iban = self._detect_iban(txt)
+                if iban and "iban" not in raw_pairs:
+                    push_pair("iban", iban)
 
-                if not s0.endswith(":"):
-                    continue
+                detected_iin = self._detect_iin(txt)
+                if detected_iin and "иин/бин" not in raw_pairs:
+                    push_pair("иин/бин", detected_iin)
 
-                for k in range(j + 1, min(len(cells), j + 6)):
+        # =================================================
+        # GENERIC / HALYK-STYLE METADATA
+        # =================================================
+        else:
+            for row in window_above:
+                cells = row[:14]
+                raw_lines.append(_row_text(cells))
 
-                    cv = cells[k]
-
-                    if cv is None:
+                # key:value
+                for c in cells:
+                    if c is None:
                         continue
 
-                    sv = str(cv).strip()
+                    s = str(c).strip()
+                    if ":" in s:
+                        k, v = s.split(":", 1)
+                        push_pair(k.strip(), v.strip())
 
-                    if sv:
-                        push_pair(s0.strip(" :"), sv)
-                        break
+                # label → value right
+                for j in range(len(cells)):
+                    c0 = cells[j]
+                    if c0 is None:
+                        continue
 
-            # IBAN
+                    s0 = str(c0).strip()
+                    if not s0.endswith(":"):
+                        continue
 
-            for c in cells:
+                    for k in range(j + 1, min(len(cells), j + 6)):
+                        cv = cells[k]
+                        if cv is None:
+                            continue
 
-                if c is None:
-                    continue
+                        sv = str(cv).strip()
+                        if sv:
+                            push_pair(s0.strip(" :"), sv)
+                            break
 
-                s = re.sub(r"\s+", "", str(c).upper())
+                for c in cells:
+                    if c is None:
+                        continue
 
-                m = _KZ_IBAN_RE.search(s)
+                    s = re.sub(r"\s+", "", str(c).upper())
+                    m = _KZ_IBAN_RE.search(s)
+                    if m:
+                        push_pair("iban", m.group(0))
 
-                if m:
-                    push_pair("iban", m.group(0))
-
-        # -------------------------------------------------
+        # =================================================
         # FOOTER PARSER
-        # -------------------------------------------------
-
+        # =================================================
         def parse_footer_rows(rows: List[List[Any]]):
-
             for row in rows:
-
                 joined = _norm_join(row)
-
                 if not joined:
                     continue
 
@@ -274,80 +279,69 @@ class StatementMetadataExtractor:
                 if not any(k in joined for k in FOOTER_PRIMARY):
                     continue
 
+                if source_bank == "kaspi":
+                    nums = _all_numbers(row)
+                    money_candidates = [n for n in nums if abs(n) >= 1000]
+
+                    if "исходящий остаток" in joined and money_candidates:
+                        set_best_money("closing_balance", max(money_candidates, key=abs))
+
+                    if "входящий остаток" in joined and money_candidates:
+                        set_best_money("opening_balance", max(money_candidates, key=abs))
+
+                    if "итого" in joined and len(money_candidates) >= 2:
+                        sorted_money = sorted(money_candidates, key=lambda x: abs(x), reverse=True)
+                        set_best_money("total_debit", sorted_money[0])
+                        set_best_money("total_credit", sorted_money[1])
+                    continue
+
                 if "исходящий остаток" in joined:
-
                     v = _first_number_to_right(row, "исходящий остаток")
-
                     if v is None:
                         nums = _all_numbers(row)
                         v = max(nums, key=abs) if nums else None
-
-                    set_best_money("исходящий остаток", v)
+                    set_best_money("closing_balance", v)
 
                 if "входящий остаток" in joined:
-
                     v = _first_number_to_right(row, "входящий остаток")
-
                     if v is None:
                         nums = _all_numbers(row)
                         v = max(nums, key=abs) if nums else None
-
-                    set_best_money("входящий остаток", v)
+                    set_best_money("opening_balance", v)
 
                 if "итого" in joined:
-
                     d = _first_number_to_right(row, "дебет")
                     c = _first_number_to_right(row, "кредит")
 
                     nums = _all_numbers(row)
-
                     if nums and (d is None or c is None):
-
                         nums_sorted = sorted(nums, key=lambda x: abs(x), reverse=True)
-
                         if d is None:
                             d = nums_sorted[0]
-
                         if c is None and len(nums_sorted) > 1:
                             c = nums_sorted[1]
 
-                    set_best_money("итого дебет", d)
-                    set_best_money("итого кредит", c)
-
-        # -------------------------------------------------
-        # BANK FOOTER STRATEGY
-        # -------------------------------------------------
+                    set_best_money("total_debit", d)
+                    set_best_money("total_credit", c)
 
         if source_bank == "kaspi":
-
             parse_footer_rows(window_tail)
 
         elif source_bank == "halyk":
-
             safe_rows: List[List[Any]] = []
-
             for row in window_below_raw:
-
                 if _looks_like_header_row(row):
                     break
-
                 safe_rows.append(row)
-
             parse_footer_rows(safe_rows)
 
         else:
-
             parse_footer_rows(window_tail)
 
         for k, (v, _) in best.items():
             raw_pairs[norm_text(k)] = v
 
-        # -------------------------------------------------
-        # LOOKUP
-        # -------------------------------------------------
-
         def find_value(keys: List[str]) -> Optional[Any]:
-
             norm_keys = [norm_text(k) for k in keys]
 
             for rk, rv in raw_pairs.items():
@@ -365,10 +359,6 @@ class StatementMetadataExtractor:
                         return rv
 
             return None
-
-        # -------------------------------------------------
-        # FINAL STATEMENT
-        # -------------------------------------------------
 
         stmt: Dict[str, Any] = {
             "client_name": None,
@@ -396,30 +386,33 @@ class StatementMetadataExtractor:
             stmt["client_name"] = str(v_client)
 
         stmt["client_iin_bin"] = looks_like_iin_bin(find_value(META_KEY_PATTERNS["iin_bin"]))
-
         stmt["contract_no"] = find_value(["contract #"] + META_KEY_PATTERNS["contract"])
 
         v_acc = find_value(META_KEY_PATTERNS["account"]) or find_value(["iban"])
-
         stmt["account_iban"] = looks_like_iban(v_acc)
 
         v_cur = find_value(META_KEY_PATTERNS["currency"])
-
         if v_cur:
             stmt["currency"] = str(v_cur).upper()
 
         stmt["account_type"] = find_value(META_KEY_PATTERNS["account_type"])
-
         stmt["statement_date"] = parse_date(find_value(META_KEY_PATTERNS["statement_date"]))
 
         per = find_value(META_KEY_PATTERNS["period"])
-
         if per:
             stmt["period_from"], stmt["period_to"] = parse_period(per)
 
-        stmt["opening_balance"] = parse_decimal(find_value(META_KEY_PATTERNS["opening_balance"]))
-        stmt["closing_balance"] = parse_decimal(find_value(META_KEY_PATTERNS["closing_balance"]))
-        stmt["total_debit"] = parse_decimal(find_value(META_KEY_PATTERNS["total_debit"]))
-        stmt["total_credit"] = parse_decimal(find_value(META_KEY_PATTERNS["total_credit"]))
+        stmt["opening_balance"] = parse_decimal(
+            find_value(META_KEY_PATTERNS["opening_balance"]) or raw_pairs.get("opening_balance")
+        )
+        stmt["closing_balance"] = parse_decimal(
+            find_value(META_KEY_PATTERNS["closing_balance"]) or raw_pairs.get("closing_balance")
+        )
+        stmt["total_debit"] = parse_decimal(
+            find_value(META_KEY_PATTERNS["total_debit"]) or raw_pairs.get("total_debit")
+        )
+        stmt["total_credit"] = parse_decimal(
+            find_value(META_KEY_PATTERNS["total_credit"]) or raw_pairs.get("total_credit")
+        )
 
         return stmt

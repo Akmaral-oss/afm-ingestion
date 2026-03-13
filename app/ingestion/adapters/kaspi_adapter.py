@@ -25,21 +25,31 @@ class SimpleBlock:
 
 
 KASPI_GROUP_HEADERS = {"плательщик", "получатель"}
+
 KASPI_SUBHEADER_MARKERS = {
     "наименование/фио",
+    "наименование",
+    "фио",
     "иин/бин",
+    "иин",
+    "бин",
     "резидентство",
     "банк",
     "бик",
     "номер счета",
+    "номер счёта",
     "счет",
+    "счёт",
 }
 
 KASPI_SINGLE_HEADER_MARKERS = [
     "дата операции",
+    "дата",
     "валюта",
     "сумма",
     "назначение",
+    "виды операции",
+    "категория документа",
 ]
 
 
@@ -194,12 +204,18 @@ class KaspiAdapter(BankAdapter):
         group_map = {"плательщик": "payer", "получатель": "receiver"}
         sub_map = {
             "наименование/фио": "name",
+            "наименование": "name",
+            "фио": "name",
             "иин/бин": "iin_bin",
+            "иин": "iin_bin",
+            "бин": "iin_bin",
             "резидентство": "residency",
             "банк": "bank",
             "бик": "bic",
             "номер счета": "account",
+            "номер счёта": "account",
             "счет": "account",
+            "счёт": "account",
         }
 
         for j in range(max(len(top), len(sub))):
@@ -208,11 +224,14 @@ class KaspiAdapter(BankAdapter):
 
             if t in group_map:
                 current_group = group_map[t]
-                combined.append(f"__group__{current_group}_{j}")
+                # ВАЖНО: у Kaspi в самой колонке group header часто лежит name
+                combined.append(f"{current_group}/name")
                 continue
 
             if current_group and s in sub_map:
                 combined.append(f"{current_group}/{sub_map[s]}")
+            elif current_group and s:
+                combined.append(f"{current_group}/{s}")
             else:
                 combined.append(t or s or f"col_{j}")
 
@@ -221,10 +240,6 @@ class KaspiAdapter(BankAdapter):
 
         df = df.dropna(axis=0, how="all")
         df = df.dropna(axis=1, how="all")
-
-        # drop fake group columns explicitly
-        df = df.loc[:, [c for c in df.columns if not str(c).startswith("__group__")]]
-
         return df
 
     def extract(self, file_path: str) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:

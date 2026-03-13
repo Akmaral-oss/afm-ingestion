@@ -3,12 +3,17 @@ from app.utils.text_utils import norm_text
 KASPI_COMBINED_TO_CANONICAL = {
     "payer/name": "payer_name",
     "payer/iin_bin": "payer_iin_bin",
+    "payer/iin": "payer_iin_bin",
+    "payer/bin": "payer_iin_bin",
     "payer/residency": "payer_residency",
     "payer/bank": "payer_bank",
     "payer/bic": "payer_bank_bic",
     "payer/account": "payer_account",
+
     "receiver/name": "receiver_name",
     "receiver/iin_bin": "receiver_iin_bin",
+    "receiver/iin": "receiver_iin_bin",
+    "receiver/bin": "receiver_iin_bin",
     "receiver/residency": "receiver_residency",
     "receiver/bank": "receiver_bank",
     "receiver/bic": "receiver_bank_bic",
