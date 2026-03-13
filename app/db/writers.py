@@ -13,7 +13,6 @@ class PostgresWriter:
         self.engine = engine
         self.parser_version = parser_version
 
-    # ---------------- raw_files ----------------
     def insert_raw_file(self, file_id: str, source_bank: str, filename: str, sha256: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(
@@ -40,7 +39,6 @@ class PostgresWriter:
                 {"file_id": file_id},
             )
 
-    # ---------------- format_registry ----------------
     def get_format_by_fingerprint(self, fingerprint: str) -> Optional[str]:
         with self.engine.begin() as conn:
             r = conn.execute(
@@ -85,8 +83,8 @@ class PostgresWriter:
             "format_id": format_id,
             "source_bank": source_bank,
             "fp": fp,
-            "hs": safe_json(header_sample),  # JSON string
-            "ev": embedding_vector,          # bytes -> BYTEA
+            "hs": safe_json(header_sample),
+            "ev": embedding_vector,
         }
 
         with self.engine.begin() as conn:
@@ -108,7 +106,6 @@ class PostgresWriter:
                 payload,
             )
 
-    # ---------------- statements / transactions ----------------
     def insert_statement(self, row: Dict[str, Any]) -> None:
         r = dict(row)
         r["meta_json"] = safe_json(r.get("meta_json") or {})
@@ -119,7 +116,7 @@ class PostgresWriter:
                     """
                     INSERT INTO afm.statements(
                       statement_id, file_id, source_bank, source_sheet, source_block_id, format_id,
-                      client_name, client_iin_bin, contract_no, account_iban, account_type, currency,
+                      client_name, client_iin_bin, account_iban, account_type, currency,
                       statement_date, period_from, period_to,
                       opening_balance, closing_balance, total_debit, total_credit,
                       meta_json
@@ -129,7 +126,7 @@ class PostgresWriter:
                       CAST(:file_id AS uuid),
                       :source_bank, :source_sheet, :source_block_id,
                       CAST(:format_id AS uuid),
-                      :client_name, :client_iin_bin, :contract_no, :account_iban, :account_type, :currency,
+                      :client_name, :client_iin_bin, :account_iban, :account_type, :currency,
                       :statement_date, :period_from, :period_to,
                       :opening_balance, :closing_balance, :total_debit, :total_credit,
                       CAST(:meta_json AS jsonb)

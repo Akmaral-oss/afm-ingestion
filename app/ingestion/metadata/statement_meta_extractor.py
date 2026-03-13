@@ -119,7 +119,6 @@ def _clean_text_value(v: Any) -> Optional[str]:
 
 class StatementMetadataExtractor:
     def _detect_iban(self, text: str) -> Optional[str]:
-        # Halyk contract ids also start with KZ, so don't treat Contract rows as IBAN rows
         if "contract" in text.lower():
             return None
 
@@ -129,7 +128,6 @@ class StatementMetadataExtractor:
             return None
 
         iban = m.group(0)
-        # practical guard: IBAN usually >= 20 chars here
         if len(iban) >= 20:
             return iban
         return None
@@ -198,9 +196,6 @@ class StatementMetadataExtractor:
             if kk not in best or score > best[kk][1]:
                 best[kk] = (pv, score)
 
-        # =================================================
-        # KASPI-SPECIFIC METADATA
-        # =================================================
         if source_bank == "kaspi":
             for i, row in enumerate(window_above):
                 cells = row[:10]
@@ -252,19 +247,14 @@ class StatementMetadataExtractor:
                 if detected_iin and "иин/бин" not in raw_pairs:
                     push_pair("иин/бин", detected_iin)
 
-        # =================================================
-        # HALYK-SPECIFIC METADATA
-        # =================================================
         elif source_bank == "halyk":
             for row in window_above:
                 cells = row[:14]
                 txt = _row_text(cells)
                 raw_lines.append(txt)
 
-                c0 = _clean_text_value(cells[0] if len(cells) > 0 else None)
                 c1 = _clean_text_value(cells[1] if len(cells) > 1 else None)
 
-                # 1) Generic key:value
                 for c in cells:
                     if c is None:
                         continue
@@ -273,8 +263,6 @@ class StatementMetadataExtractor:
                         k, v = s.split(":", 1)
                         push_pair(k.strip(), v.strip())
 
-                # 2) Halyk client line:
-                # "ИИН/БИН 990124000000 | ДҮЙСЕКАКА А.Т."
                 if txt:
                     detected_iin = self._detect_iin(txt)
                     if detected_iin and ("иин/бин" in txt.lower() or "иин" in txt.lower() or "бин" in txt.lower()):
@@ -282,23 +270,19 @@ class StatementMetadataExtractor:
                         if c1:
                             push_pair("клиент", c1)
 
-                # 3) Contract line
                 contract = self._detect_contract(txt)
                 if contract:
                     push_pair("contract #", contract)
 
-                # 4) Contract currency
                 if "валюта контракта" in txt.lower():
                     cur = self._detect_currency(txt)
                     if cur:
                         push_pair("валюта контракта", cur)
 
-                # 5) IBAN only if not contract line
                 iban = self._detect_iban(txt)
                 if iban and "iban" not in raw_pairs:
                     push_pair("iban", iban)
 
-                # 6) right-side fallback for labels ending with :
                 for j in range(len(cells)):
                     c_label = cells[j]
                     if c_label is None:
@@ -315,9 +299,6 @@ class StatementMetadataExtractor:
                             push_pair(s0.strip(" :"), sv)
                             break
 
-        # =================================================
-        # GENERIC FALLBACK
-        # =================================================
         else:
             for row in window_above:
                 cells = row[:14]
@@ -356,9 +337,6 @@ class StatementMetadataExtractor:
                     if m:
                         push_pair("iban", m.group(0))
 
-        # =================================================
-        # FOOTER PARSER
-        # =================================================
         def parse_footer_rows(rows: List[List[Any]]):
             for row in rows:
                 joined = _norm_join(row)
@@ -454,7 +432,6 @@ class StatementMetadataExtractor:
         stmt: Dict[str, Any] = {
             "client_name": None,
             "client_iin_bin": None,
-            "contract_no": None,
             "account_iban": None,
             "account_type": None,
             "currency": None,
@@ -481,10 +458,14 @@ class StatementMetadataExtractor:
             stmt["client_name"] = str(v_client).strip()
 
         stmt["client_iin_bin"] = looks_like_iin_bin(find_value(META_KEY_PATTERNS["iin_bin"]))
-        stmt["contract_no"] = find_value(["contract #"] + META_KEY_PATTERNS["contract"])
 
-        v_acc = find_value(META_KEY_PATTERNS["account"]) or find_value(["iban"])
-        stmt["account_iban"] = looks_like_iban(v_acc)
+        contract_val = find_value(["contract #"] + META_KEY_PATTERNS["contract"])
+
+        if source_bank == "halyk" and contract_val:
+            stmt["account_iban"] = contract_val
+        else:
+            v_acc = find_value(META_KEY_PATTERNS["account"]) or find_value(["iban"])
+            stmt["account_iban"] = looks_like_iban(v_acc)
 
         v_cur = find_value(META_KEY_PATTERNS["currency"]) or raw_pairs.get("валюта контракта")
         if v_cur:

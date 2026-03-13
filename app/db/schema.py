@@ -54,7 +54,6 @@ def ensure_schema(engine: Engine) -> None:
 
           client_name     TEXT,
           client_iin_bin  CHAR(12),
-          contract_no     TEXT,
           account_iban    TEXT,
           account_type    TEXT,
           currency        TEXT,
@@ -110,14 +109,12 @@ def ensure_schema(engine: Engine) -> None:
           payer_iin_bin       CHAR(12),
           payer_residency     TEXT,
           payer_bank          TEXT,
-          payer_bank_bic      TEXT,
           payer_account       TEXT,
 
           receiver_name       TEXT,
           receiver_iin_bin    CHAR(12),
           receiver_residency  TEXT,
           receiver_bank       TEXT,
-          receiver_bank_bic   TEXT,
           receiver_account    TEXT,
 
           confidence_score    REAL NOT NULL DEFAULT 1.0,
@@ -173,39 +170,17 @@ def ensure_schema(engine: Engine) -> None:
             )
         )
 
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_fmt_bank ON afm.format_registry(source_bank);"
-            )
-        )
-        conn.execute(
-            text("CREATE INDEX IF NOT EXISTS idx_stmt_file ON afm.statements(file_id);")
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_stmt_account ON afm.statements(account_iban);"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_tx_core_date ON afm.transactions_core(operation_date);"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_tx_core_file ON afm.transactions_core(file_id);"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_tx_stmt ON afm.transactions_core(statement_id);"
-            )
-        )
-        conn.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS idx_tx_format ON afm.transactions_core(format_id);"
-            )
-        )
+        conn.execute(text("ALTER TABLE afm.statements DROP COLUMN IF EXISTS contract_no;"))
+        conn.execute(text("ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS payer_bank_bic;"))
+        conn.execute(text("ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS receiver_bank_bic;"))
+
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_fmt_bank ON afm.format_registry(source_bank);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_stmt_file ON afm.statements(file_id);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_stmt_account ON afm.statements(account_iban);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_core_date ON afm.transactions_core(operation_date);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_core_file ON afm.transactions_core(file_id);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_stmt ON afm.transactions_core(statement_id);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_format ON afm.transactions_core(format_id);"))
 
         conn.execute(
             text(

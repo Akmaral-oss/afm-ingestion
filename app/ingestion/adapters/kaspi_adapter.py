@@ -35,7 +35,6 @@ KASPI_SUBHEADER_MARKERS = {
     "бин",
     "резидентство",
     "банк",
-    "бик",
     "номер счета",
     "номер счёта",
     "счет",
@@ -186,6 +185,7 @@ class KaspiAdapter(BankAdapter):
         return blocks
 
     def _build_df(self, grid: List[List[Any]], block: SimpleBlock) -> pd.DataFrame:
+
         if block.header_rows == 1:
             header = [norm_text(x) for x in grid[block.header_row_idx]]
             data = grid[block.data_start_row_idx:block.data_end_row_idx + 1]
@@ -195,13 +195,14 @@ class KaspiAdapter(BankAdapter):
             df = df.dropna(axis=1, how="all")
             return df
 
-        top = [norm_text(x) for x in grid[block.group_row_idx]]  # type: ignore[arg-type]
-        sub = [norm_text(x) for x in grid[block.subheader_row_idx]]  # type: ignore[arg-type]
+        top = [norm_text(x) for x in grid[block.group_row_idx]]
+        sub = [norm_text(x) for x in grid[block.subheader_row_idx]]
 
         combined: List[str] = []
         current_group: str | None = None
 
         group_map = {"плательщик": "payer", "получатель": "receiver"}
+
         sub_map = {
             "наименование/фио": "name",
             "наименование": "name",
@@ -211,7 +212,6 @@ class KaspiAdapter(BankAdapter):
             "бин": "iin_bin",
             "резидентство": "residency",
             "банк": "bank",
-            "бик": "bic",
             "номер счета": "account",
             "номер счёта": "account",
             "счет": "account",
@@ -219,12 +219,12 @@ class KaspiAdapter(BankAdapter):
         }
 
         for j in range(max(len(top), len(sub))):
+
             t = top[j] if j < len(top) else ""
             s = sub[j] if j < len(sub) else ""
 
             if t in group_map:
                 current_group = group_map[t]
-                # ВАЖНО: у Kaspi в самой колонке group header часто лежит name
                 combined.append(f"{current_group}/name")
                 continue
 
@@ -240,17 +240,22 @@ class KaspiAdapter(BankAdapter):
 
         df = df.dropna(axis=0, how="all")
         df = df.dropna(axis=1, how="all")
+
         return df
 
     def extract(self, file_path: str) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
+
         wb = load_workbook(file_path, data_only=True, read_only=True)
+
         out: List[Tuple[pd.DataFrame, Dict[str, Any]]] = []
 
         for sheet_name in wb.sheetnames:
+
             grid = self.load_grid(file_path, sheet_name)
             blocks = self._detect_blocks(grid, sheet_name)
 
             for bidx, b in enumerate(blocks, start=1):
+
                 df = self._build_df(grid, b)
 
                 if df.empty or len(df.columns) < 3:
@@ -278,6 +283,7 @@ class KaspiAdapter(BankAdapter):
                 stmt_meta["source_sheet"] = sheet_name
                 stmt_meta["source_block_id"] = bidx
                 stmt_meta["source_row_base"] = b.data_start_row_idx
+
                 stmt_meta["meta_json"] = {
                     **(stmt_meta.get("meta_json") or {}),
                     "source": "kaspi_adapter",

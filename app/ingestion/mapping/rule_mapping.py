@@ -7,7 +7,6 @@ KASPI_COMBINED_TO_CANONICAL = {
     "payer/bin": "payer_iin_bin",
     "payer/residency": "payer_residency",
     "payer/bank": "payer_bank",
-    "payer/bic": "payer_bank_bic",
     "payer/account": "payer_account",
 
     "receiver/name": "receiver_name",
@@ -16,7 +15,6 @@ KASPI_COMBINED_TO_CANONICAL = {
     "receiver/bin": "receiver_iin_bin",
     "receiver/residency": "receiver_residency",
     "receiver/bank": "receiver_bank",
-    "receiver/bic": "receiver_bank_bic",
     "receiver/account": "receiver_account",
 }
 
@@ -25,17 +23,22 @@ RULE_BASED_HEADER_MAP = {
     "дата операции": "operation_ts",
     "дата/время": "operation_ts",
     "дата": "operation_ts",
+
     "валюта операции": "currency",
     "валюта": "currency",
+
     "виды операции (категория документа)": "operation_type_raw",
     "виды операции": "operation_type_raw",
     "категория документа": "operation_type_raw",
+
     "наименование сдп (при наличии)": "sdp_name",
     "наименование сдп": "sdp_name",
     "сдп": "sdp_name",
+
     "код назначения платежа": "purpose_code",
     "назначение платежа": "purpose_text",
     "назначение": "purpose_text",
+
     "сумма в тенге": "amount_kzt",
     "сумма в валюте ее проведения": "amount_currency",
     "сумма в валюте её проведения": "amount_currency",
@@ -44,18 +47,18 @@ RULE_BASED_HEADER_MAP = {
     "сумма по кредиту": "amount_credit",
     "сумма по дебету": "amount_debit",
     "сумма": "amount_currency",
+
     "наименование/фио плательщика": "payer_name",
     "иин/бин плательщика": "payer_iin_bin",
     "резидентство плательщика": "payer_residency",
     "банк плательщика": "payer_bank",
-    "бик банка плательщика": "payer_bank_bic",
     "счет плательщика": "payer_account",
     "номер счета плательщика": "payer_account",
+
     "наименование/фио получателя": "receiver_name",
     "иин/бин получателя": "receiver_iin_bin",
     "резидентство получателя": "receiver_residency",
     "банк получателя": "receiver_bank",
-    "бик банка получателя": "receiver_bank_bic",
     "счет получателя": "receiver_account",
     "номер счета получателя": "receiver_account",
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -31,13 +31,11 @@ CANONICAL_FIELD_DESCRIPTIONS = {
     "payer_iin_bin": "ИИН/БИН плательщика / payer IIN/BIN",
     "payer_residency": "Резидентство плательщика / payer residency",
     "payer_bank": "Банк плательщика / payer bank",
-    "payer_bank_bic": "БИК банка плательщика / payer bank BIC",
     "payer_account": "Счет/IBAN плательщика / payer account",
     "receiver_name": "Наименование/ФИО получателя / receiver name",
     "receiver_iin_bin": "ИИН/БИН получателя / receiver IIN/BIN",
     "receiver_residency": "Резидентство получателя / receiver residency",
     "receiver_bank": "Банк получателя / receiver bank",
-    "receiver_bank_bic": "БИК банка получателя / receiver bank BIC",
     "receiver_account": "Счет/IBAN получателя / receiver account",
     "purpose_code": "Код назначения платежа / purpose code",
     "purpose_text": "Назначение платежа / payment purpose text",
@@ -60,24 +58,27 @@ class CanonicalMapper:
         mapped: Dict[str, str] = {}
         cols = list(df.columns)
 
-        # pass1 exact/rules
+        # pass1 exact / rule-based
         for c in cols:
             canon = rule_map_column(c)
             if canon:
                 mapped[c] = canon
 
-        # pass2 fuzzy
+        # pass2 fuzzy lexical
         for c in cols:
             if c in mapped:
                 continue
+
             nc = norm_text(c)
             best_field = None
             best_score = 0
+
             for k, v in RULE_BASED_HEADER_MAP.items():
                 sc = fuzz.token_set_ratio(nc, k)
                 if sc > best_score:
                     best_score = sc
                     best_field = v
+
             if best_score >= 92 and best_field:
                 mapped[c] = best_field
 
@@ -86,18 +87,22 @@ class CanonicalMapper:
             for c in cols:
                 if c in mapped:
                     continue
+
                 samples = df[c].dropna().astype(str).head(5).tolist()
                 probe = f"{norm_text(c)} | examples: " + " ; ".join(
                     [norm_text(s) for s in samples]
                 )
                 vec = self.embedder.embed([probe])[0]
+
                 best_field = None
                 best_sim = -1.0
+
                 for idx, f in enumerate(self.canon_fields):
                     sim = cosine_sim(vec, self.canon_vecs[idx])
                     if sim > best_sim:
                         best_sim = sim
                         best_field = f
+
                 if best_field is not None and best_sim >= self.threshold:
                     mapped[c] = best_field
 
@@ -116,10 +121,10 @@ class CanonicalMapper:
 
         unmapped_cols = [c for c in df.columns if c not in mapped]
 
+        from app.ingestion.validation.validators import is_service_row
+
         for ridx, row in df.iterrows():
             row_values = [row.get(c) for c in df.columns]
-            from app.ingestion.validation.validators import is_service_row
-
             if is_service_row(row_values):
                 continue
 
@@ -150,13 +155,11 @@ class CanonicalMapper:
                 "payer_iin_bin": None,
                 "payer_residency": None,
                 "payer_bank": None,
-                "payer_bank_bic": None,
                 "payer_account": None,
                 "receiver_name": None,
                 "receiver_iin_bin": None,
                 "receiver_residency": None,
                 "receiver_bank": None,
-                "receiver_bank_bic": None,
                 "receiver_account": None,
                 "confidence_score": 1.0,
                 "parse_warnings": None,
@@ -184,11 +187,7 @@ class CanonicalMapper:
 
                 elif canon in ("payer_iin_bin", "receiver_iin_bin"):
                     core[canon] = looks_like_iin_bin(val)
-                    if (
-                        val is not None
-                        and core[canon] is None
-                        and str(val).strip() != ""
-                    ):
+                    if val is not None and core[canon] is None and str(val).strip() != "":
                         warnings.append(f"bad_iinbin:{canon}:{val}")
 
                 elif canon == "purpose_text":
@@ -220,9 +219,11 @@ class CanonicalMapper:
                 "recv": core.get("receiver_iin_bin") or core.get("receiver_name"),
                 "purpose": (core.get("purpose_text") or "")[:200],
             }
+
             row_hash = hashlib.sha256(
                 safe_json(dedup_payload).encode("utf-8")
             ).hexdigest()
+
             core["row_hash"] = row_hash
             core["tx_id"] = str(uuid.uuid5(TXID_NAMESPACE_UUID, row_hash))
 
@@ -237,8 +238,14 @@ class CanonicalMapper:
                 core["confidence_score"] = 0.9
 
             core_rows.append(core)
+
             if ext:
-                ext_rows.append({"tx_id": core["tx_id"], "ext_json": ext})
+                ext_rows.append(
+                    {
+                        "tx_id": core["tx_id"],
+                        "ext_json": ext,
+                    }
+                )
 
         for c in unmapped_cols:
             samples = df[c].dropna().astype(str).head(5).tolist()
