@@ -1,0 +1,14 @@
+pandas
+openpyxl
+numpy
+python-dateutil
+sqlalchemy
+psycopg2-binary
+rapidfuzz
+
+# embedding model
+sentence-transformers
+torch
+
+# NL2SQL
+requests

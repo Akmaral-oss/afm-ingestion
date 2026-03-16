@@ -1,0 +1,16 @@
+.venv/
+data/
+*.xlsx
+*.csv
+*.parquet
+__pycache__/
+.DS_Store
+.env
+bge-m3
+/data
+
+models
+.models/*
+logs/
+*.db
+*.sqlite
