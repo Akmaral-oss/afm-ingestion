@@ -378,3 +378,83 @@ def ensure_schema(engine: Engine) -> None:
                 "ON afm.query_history(execution_success);"
             )
         )
+
+        # ── query_history: feedback + audit columns (idempotent) ───────────
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS feedback_note TEXT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS feedback_at TIMESTAMPTZ;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS app_source TEXT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS attempt_count INT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS execution_time_ms INT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS row_count INT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS repaired BOOLEAN NOT NULL DEFAULT FALSE;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS query_mode TEXT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS max_rows INT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS llm_backend TEXT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS llm_model TEXT;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS edited_sql BOOLEAN NOT NULL DEFAULT FALSE;"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE afm.query_history "
+                "ADD COLUMN IF NOT EXISTS error_text TEXT;"
+            )
+        )
