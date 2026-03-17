@@ -14,3 +14,4 @@ torch
 requests
 python-dotenv
 streamlit
+google-genai

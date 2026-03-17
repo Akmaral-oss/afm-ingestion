@@ -37,6 +37,7 @@ SQL RULES (strictly follow all of them):
 8.  Always return human-readable columns (dates, names, amounts, purpose_text, direction when relevant).
 9.  Do not use DROP, DELETE, UPDATE, INSERT, ALTER, CREATE.
 10. Do not add explanations — output raw SQL only.
+11. Try to reason and in some null values should be excluded exclude them in cases like (Give me top transactions by amount -> AS you know top transactions don't need to be null, so add null exclusion logic in where clause)
 
 STRUCTURED FILTER RULES:
 11. If the question contains structured constraints such as date, amount, direction, currency, payer, receiver, bank, or source_bank,

@@ -13,6 +13,7 @@ Integration point — set up your model backend in __init__ and implement
 """
 
 import logging
+import os
 import re
 from abc import ABC, abstractmethod
 
@@ -68,6 +69,120 @@ class OllamaBackend(LLMBackend):
         )
         resp.raise_for_status()
         return resp.json()["response"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gemini backend  (temporary testing backend)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class GeminiBackend(LLMBackend):
+    """
+    Calls Gemini via google-genai.
+
+    API key is read from process env: GEMINI_API_KEY
+    """
+
+    def __init__(
+        self,
+        model: str = "gemini-3-flash-preview",
+        api_key_env: str = "GEMINI_API_KEY",
+    ):
+        self.model = model
+        self.api_key_env = api_key_env
+
+    def generate(self, prompt: str, max_new_tokens: int = 512) -> str:
+        try:
+            from google import genai  # type: ignore
+            from google.genai import types  # type: ignore
+        except Exception as exc:
+            raise RuntimeError(
+                "google-genai is not installed. Run: pip install google-genai"
+            ) from exc
+
+        api_key = os.environ.get(self.api_key_env)
+        if not api_key:
+            raise RuntimeError(
+                f"{self.api_key_env} is not set. Export it in your shell before running Gemini."
+            )
+
+        client = genai.Client(api_key=api_key)
+
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt)],
+            )
+        ]
+        tools = [types.Tool(googleSearch=types.GoogleSearch())]
+        generate_content_config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(
+                thinking_level="HIGH",
+            ),
+            safety_settings=[
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
+            ],
+            tools=tools,
+        )
+
+        chunks: list[str] = []
+        for chunk in client.models.generate_content_stream(
+            model=self.model,
+            contents=contents,
+            config=generate_content_config,
+        ):
+            text_chunk = getattr(chunk, "text", None)
+            if text_chunk:
+                chunks.append(text_chunk)
+
+        output = "".join(chunks).strip()
+        if not output:
+            raise RuntimeError("Gemini returned empty output.")
+        return output
+
+
+def build_llm_backend(
+    model_name: str,
+    base_url: str = "http://localhost:11434",
+    timeout_s: int = 120,
+) -> LLMBackend:
+    """
+    Build an LLM backend from AFM_LLM_MODEL value.
+
+    Gemini routing rules:
+      - `gemini` -> use Gemini with default model gemini-3-flash-preview
+      - `gemini:<model>` -> use the explicit Gemini model
+      - model names starting with `gemini` -> use Gemini directly
+    Otherwise, uses Ollama backend.
+    """
+    raw = (model_name or "").split("#", 1)[0].strip()
+    lower = raw.lower()
+
+    if lower == "gemini":
+        return GeminiBackend(model="gemini-3-flash-preview")
+
+    if lower.startswith("gemini:"):
+        gemini_model = raw.split(":", 1)[1].strip() or "gemini-3-flash-preview"
+        return GeminiBackend(model=gemini_model)
+
+    if lower.startswith("gemini"):
+        return GeminiBackend(model=raw)
+
+    return OllamaBackend(model=raw or "qwen2.5-coder:14b", base_url=base_url, timeout_s=timeout_s)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

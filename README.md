@@ -29,6 +29,12 @@ Set the model in `.env`, for example:
 
 `AFM_LLM_MODEL=qwen2.5-coder:14b`
 
+Gemini test mode:
+
+- Set `AFM_LLM_MODEL=gemini` (or `AFM_LLM_MODEL=gemini:gemini-3-flash-preview`).
+- Export `GEMINI_API_KEY` in your shell (not in `.env`).
+- Optional test script: `python scripts/gemini_llm_test.py "INSERT_INPUT_HERE"`
+
 If you want the previous local embedding behavior:
 
 `AFM_EMBEDDING_PROVIDER=sentence-transformers`
