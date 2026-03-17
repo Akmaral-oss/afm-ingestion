@@ -52,6 +52,7 @@ class QueryResult:
     execution_time_s: float
     repaired: bool = False
     error: Optional[str] = None
+    history_id: Optional[str] = None
 
     @property
     def success(self) -> bool:
@@ -167,6 +168,7 @@ class QueryService:
                 rows=[],
                 execution_time_s=elapsed,
                 error=str(exc),
+                history_id=str(uuid.uuid4()),
             )
             self._save_history(result, query_embedding)
             return result
@@ -178,6 +180,7 @@ class QueryService:
             rows=rows,
             execution_time_s=elapsed,
             repaired=repaired,
+            history_id=str(uuid.uuid4()),
         )
         self._save_history(result, query_embedding)
         return result
@@ -204,28 +207,67 @@ class QueryService:
         if not self.save_history:
             return
         try:
-            from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
-            emb_bytes: Optional[bytes] = None
+            emb_val = None
             if self.embedder.enabled and embedding is not None:
-                emb_bytes = EmbeddingBackend.vec_to_bytes(embedding)
+                import numpy as np
+                arr = np.asarray(embedding, dtype=np.float32).reshape(-1)
+                emb_val = f"[{','.join(str(x) for x in arr)}]"
 
             with self.engine.begin() as conn:
                 conn.execute(
                     text(
                         """
                         INSERT INTO afm.query_history
-                          (id, question, generated_sql, execution_success, embedding)
+                          (id, question, generated_sql, execution_success, embedding,
+                           execution_time_ms, row_count, repaired, error_text)
                         VALUES
-                          (CAST(:id AS uuid), :q, :sql, :ok, :emb)
+                          (CAST(:id AS uuid), :q, :sql, :ok, CAST(:emb AS vector),
+                           :exec_ms, :rows, :repaired, :err)
                         """
                     ),
                     {
-                        "id": str(uuid.uuid4()),
+                        "id": result.history_id,
                         "q": result.question,
                         "sql": result.sql,
                         "ok": result.success,
-                        "emb": emb_bytes,
+                        "emb": emb_val,
+                        "exec_ms": int(result.execution_time_s * 1000) if result.execution_time_s else None,
+                        "rows": len(result.rows) if result.rows else 0,
+                        "repaired": result.repaired,
+                        "err": result.error,
                     },
                 )
-        except Exception:
-            log.warning("Failed to save query history (non-fatal)")
+        except Exception as e:
+            # Fallback for environments without pgvector (where column is BYTEA)
+            try:
+                from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
+                emb_bytes = None
+                if self.embedder.enabled and embedding is not None:
+                    emb_bytes = EmbeddingBackend.vec_to_bytes(embedding)
+                
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO afm.query_history
+                              (id, question, generated_sql, execution_success, embedding,
+                               execution_time_ms, row_count, repaired, error_text)
+                            VALUES
+                              (CAST(:id AS uuid), :q, :sql, :ok, :emb,
+                               :exec_ms, :rows, :repaired, :err)
+                            """
+                        ),
+                        {
+                            "id": result.history_id,
+                            "q": result.question,
+                            "sql": result.sql,
+                            "ok": result.success,
+                            "emb": emb_bytes,
+                            "exec_ms": int(result.execution_time_s * 1000) if result.execution_time_s else None,
+                            "rows": len(result.rows) if result.rows else 0,
+                            "repaired": result.repaired,
+                            "err": result.error,
+                        },
+                    )
+            except Exception as e2:
+                log.exception("Failed to save query history (non-fatal): %s / %s", e, e2)
