@@ -11,7 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.logging_config import setup_logging
-from app.config import Settings, load_settings_from_env
+from app.config import Settings
 from app.ingestion.pipeline import IngestionPipeline
 
 
@@ -103,26 +103,25 @@ def main():
 
     setup_logging(getattr(logging, args.loglevel.upper(), logging.INFO))
 
-    env_settings = load_settings_from_env(args.env_file)
-    pg_dsn = args.pg or env_settings.pg_dsn
+    pg_dsn = args.pg or settings.pg_dsn
     if not pg_dsn:
         raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
 
-    embedding_model_path = args.model if args.model is not None else env_settings.embedding_model_path
+    embedding_model_path = args.model if args.model is not None else settings.embedding_model_path
     embedding_provider = (
-        args.embedding_provider if args.embedding_provider is not None else env_settings.embedding_provider
+        args.embedding_provider if args.embedding_provider is not None else settings.embedding_provider
     )
-    embedding_base_url = args.embedding_url or env_settings.embedding_base_url
+    embedding_base_url = args.embedding_url or settings.embedding_base_url
     embedding_timeout_s = (
-        args.embedding_timeout if args.embedding_timeout is not None else env_settings.embedding_timeout_s
+        args.embedding_timeout if args.embedding_timeout is not None else settings.embedding_timeout_s
     )
     embedding_threshold = (
-        args.threshold if args.threshold is not None else env_settings.embedding_threshold
+        args.threshold if args.threshold is not None else settings.embedding_threshold
     )
     format_similarity_threshold = (
-        args.format_sim if args.format_sim is not None else env_settings.format_similarity_threshold
+        args.format_sim if args.format_sim is not None else settings.format_similarity_threshold
     )
-    store_raw_row_json = args.rawjson or env_settings.store_raw_row_json
+    store_raw_row_json = args.rawjson or settings.store_raw_row_json
 
     settings = Settings(
         pg_dsn=pg_dsn,
@@ -133,8 +132,8 @@ def main():
         embedding_threshold=embedding_threshold,
         format_similarity_threshold=format_similarity_threshold,
         store_raw_row_json=store_raw_row_json,
-        parser_version=env_settings.parser_version,
-        max_meta_lookback_rows=env_settings.max_meta_lookback_rows,
+        parser_version=settings.parser_version,
+        max_meta_lookback_rows=settings.max_meta_lookback_rows,
     )
 
     pipe = IngestionPipeline(settings)
