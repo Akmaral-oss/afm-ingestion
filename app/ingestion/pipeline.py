@@ -85,7 +85,12 @@ class IngestionPipeline:
         ensure_schema(self.engine)
         self.writer = PostgresWriter(self.engine, parser_version=settings.parser_version)
 
-        self.embedder = EmbeddingBackend(settings.embedding_model_path)
+        self.embedder = EmbeddingBackend(
+            settings.embedding_model_path,
+            provider=settings.embedding_provider,
+            ollama_base_url=settings.embedding_base_url,
+            ollama_timeout_s=settings.embedding_timeout_s,
+        )
         self.mapper = CanonicalMapper(self.embedder, threshold=settings.embedding_threshold)
 
         self.format_registry = FormatRegistryService(
