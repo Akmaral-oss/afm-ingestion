@@ -29,7 +29,7 @@ from app.db.engine import make_engine
 from app.db.schema import ensure_schema
 from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
 from app.nl2sql.query_service import QueryService
-from app.nl2sql.sql_generator import OllamaBackend
+from app.nl2sql.sql_generator import build_llm_backend
 from app.logging_config import setup_logging
 
 
@@ -80,7 +80,11 @@ def main() -> None:
         ollama_base_url=embedding_url,
         ollama_timeout_s=embedding_timeout,
     )
-    llm_backend = OllamaBackend(model=llm_model, base_url=llm_url, timeout_s=llm_timeout)
+    llm_backend = build_llm_backend(
+        model_name=llm_model,
+        base_url=llm_url,
+        timeout_s=llm_timeout,
+    )
 
     service = QueryService.build(
         engine,
