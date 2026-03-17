@@ -90,8 +90,9 @@ class QueryService:
         embedder,
         llm_backend: LLMBackend,
         save_history: bool = True,
+        max_new_tokens: int = 512,
     ) -> "QueryService":
-        generator = SQLGenerator(llm_backend)
+        generator = SQLGenerator(llm_backend, max_new_tokens=max_new_tokens)
         repair = SQLRepair(generator)
         retriever = SemanticRetriever(engine, embedder)
         executor = QueryExecutor(engine)

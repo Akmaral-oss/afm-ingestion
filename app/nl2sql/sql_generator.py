@@ -43,16 +43,28 @@ class OllamaBackend(LLMBackend):
         # or:
         backend = OllamaBackend(model="qwen2.5-coder:14b")
     """
-    def __init__(self, model: str = "llama4-scout:latest", base_url: str = "http://localhost:11434"):
+    def __init__(
+        self,
+        model: str = "qwen2.5-coder:14b",
+        base_url: str = "http://localhost:11434",
+        timeout_s: int = 120,
+    ):
         self.model = model
         self.base_url = base_url
+        # requests timeout=None means no timeout.
+        self.timeout_s = None if timeout_s <= 0 else timeout_s
 
     def generate(self, prompt: str, max_new_tokens: int = 512) -> str:
         import requests
         resp = requests.post(
             f"{self.base_url}/api/generate",
-            json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=120,
+            json={
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"num_predict": max_new_tokens},
+            },
+            timeout=self.timeout_s,
         )
         resp.raise_for_status()
         return resp.json()["response"]
@@ -88,11 +100,12 @@ class HuggingFaceBackend(LLMBackend):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SQLGenerator:
-    def __init__(self, backend: LLMBackend):
+    def __init__(self, backend: LLMBackend, max_new_tokens: int = 512):
         self.backend = backend
+        self.max_new_tokens = max_new_tokens
 
     def generate(self, prompt: str) -> str:
-        raw = self.backend.generate(prompt)
+        raw = self.backend.generate(prompt, max_new_tokens=self.max_new_tokens)
         return self._clean(raw)
 
     # ── helpers ───────────────────────────────────────────────────────────────

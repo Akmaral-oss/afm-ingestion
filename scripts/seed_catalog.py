@@ -19,10 +19,17 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
+from pathlib import Path
 
 import numpy as np
 from sqlalchemy import text
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from app.config import load_settings_from_env
 from app.db.engine import make_engine
 from app.db.schema import ensure_schema
 from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
@@ -108,17 +115,46 @@ def seed_sample_values(engine, embedder: EmbeddingBackend, sample_limit: int) ->
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pg", required=True)
-    ap.add_argument("--model", required=True, help="Path to BGE-M3 weights")
+    ap.add_argument("--env-file", default=None, help="Path to .env file (optional)")
+    ap.add_argument("--pg", default=None, help="Postgres DSN. Falls back to AFM_PG_DSN")
+    ap.add_argument(
+        "--model",
+        default=None,
+        help="Embedding model (Ollama model name or local path). Falls back to AFM_EMBEDDING_MODEL",
+    )
+    ap.add_argument("--embedding_provider", default=None, help="Embedding provider: ollama|sentence-transformers|disabled")
+    ap.add_argument("--embedding_url", default=None, help="Ollama base URL for embeddings")
+    ap.add_argument("--embedding_timeout", type=int, default=None, help="Ollama embedding timeout (seconds)")
     ap.add_argument("--sample_limit", type=int, default=5_000)
     args = ap.parse_args()
 
-    engine = make_engine(args.pg)
+    env_settings = load_settings_from_env(args.env_file)
+    pg_dsn = args.pg or env_settings.pg_dsn
+    model_name = args.model if args.model is not None else env_settings.embedding_model_path
+    embedding_provider = (
+        args.embedding_provider if args.embedding_provider is not None else env_settings.embedding_provider
+    )
+    embedding_url = args.embedding_url or env_settings.embedding_base_url
+    embedding_timeout = (
+        args.embedding_timeout if args.embedding_timeout is not None else env_settings.embedding_timeout_s
+    )
+
+    if not pg_dsn:
+        raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
+    if not model_name:
+        raise SystemExit("Embedding model is not set. Use --model or AFM_EMBEDDING_MODEL in .env.")
+
+    engine = make_engine(pg_dsn)
     ensure_schema(engine)
 
-    embedder = EmbeddingBackend(args.model)
+    embedder = EmbeddingBackend(
+        model_name,
+        provider=embedding_provider,
+        ollama_base_url=embedding_url,
+        ollama_timeout_s=embedding_timeout,
+    )
     if not embedder.enabled:
-        raise SystemExit("Embedding model failed to load. Check --model path.")
+        raise SystemExit("Embedding model failed to load. Check --model/AFM_EMBEDDING_MODEL path.")
 
     embed_catalog(engine, embedder)
     seed_sample_values(engine, embedder, args.sample_limit)
