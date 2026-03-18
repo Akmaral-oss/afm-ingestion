@@ -15,7 +15,7 @@ engine = create_engine(
 )
 
 # 2. Async engine (for FastAPI added by Akberen)
-async_url = getattr(settings, "DATABASE_URL", getattr(settings, "pg_dsn", "postgresql+asyncpg://..."))
+async_url = settings.sync_pg_dsn.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
 if async_url.startswith("postgresql://"):
     async_url = async_url.replace("postgresql://", "postgresql+asyncpg://")
 
