@@ -24,8 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.config import load_settings_from_env
-from app.db.engine import make_engine
+from app.config import settings
+from app.database import engine
 from app.db.schema import ensure_schema
 from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
 from app.nl2sql.query_service import QueryService
@@ -51,27 +51,25 @@ def main() -> None:
 
     setup_logging(getattr(logging, args.loglevel.upper(), logging.INFO))
 
-    env_settings = load_settings_from_env(args.env_file)
-    pg_dsn = args.pg or env_settings.pg_dsn
+    pg_dsn = args.pg or settings.pg_dsn
     if not pg_dsn:
         raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
 
-    model_name = args.model if args.model is not None else env_settings.embedding_model_path
+    model_name = args.model if args.model is not None else settings.embedding_model_path
     embedding_provider = (
-        args.embedding_provider if args.embedding_provider is not None else env_settings.embedding_provider
+        args.embedding_provider if args.embedding_provider is not None else settings.embedding_provider
     )
-    embedding_url = args.embedding_url or env_settings.embedding_base_url
+    embedding_url = args.embedding_url or settings.embedding_base_url
     embedding_timeout = (
-        args.embedding_timeout if args.embedding_timeout is not None else env_settings.embedding_timeout_s
+        args.embedding_timeout if args.embedding_timeout is not None else settings.embedding_timeout_s
     )
-    llm_url = args.llm_url or env_settings.llm_base_url
-    llm_model = args.llm_model or env_settings.llm_model_name
-    llm_timeout = args.llm_timeout if args.llm_timeout is not None else env_settings.llm_timeout_s
+    llm_url = args.llm_url or settings.llm_base_url
+    llm_model = args.llm_model or settings.llm_model_name
+    llm_timeout = args.llm_timeout if args.llm_timeout is not None else settings.llm_timeout_s
     llm_max_new_tokens = (
-        args.max_new_tokens if args.max_new_tokens is not None else env_settings.llm_max_new_tokens
+        args.max_new_tokens if args.max_new_tokens is not None else settings.llm_max_new_tokens
     )
 
-    engine = make_engine(pg_dsn)
     ensure_schema(engine)
 
     embedder = EmbeddingBackend(

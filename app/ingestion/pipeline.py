@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 
-from app.config import Settings
-from app.db.engine import make_engine
+from app.config import settings
+from app.database import engine
 from app.db.schema import ensure_schema
 from app.db.writers import PostgresWriter
 
@@ -77,11 +77,11 @@ def _attach_embeddings(rows: List[Dict[str, Any]], embedder: EmbeddingBackend) -
 
 
 class IngestionPipeline:
-    def __init__(self, settings: Settings):
+    def __init__(self):
         self.settings = settings
         self.adapters = load_adapters()
 
-        self.engine = make_engine(settings.pg_dsn)
+        self.engine = engine
         ensure_schema(self.engine)
         self.writer = PostgresWriter(self.engine, parser_version=settings.parser_version)
 
