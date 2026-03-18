@@ -102,6 +102,58 @@ class ApiSettings(BaseSettings):
         return self._to_sync_pg_dsn(self.DATABASE_URL)
 
     @property
+    def embedding_model_path(self) -> Optional[str]:
+        return self.AFM_EMBEDDING_MODEL or self.EMBEDDING_MODEL_PATH or None
+
+    @property
+    def embedding_provider(self) -> str:
+        return self.AFM_EMBEDDING_PROVIDER
+
+    @property
+    def embedding_base_url(self) -> str:
+        return self.AFM_EMBEDDING_BASE_URL
+
+    @property
+    def embedding_timeout_s(self) -> int:
+        return self.AFM_EMBEDDING_TIMEOUT_S
+
+    @property
+    def llm_model_name(self) -> str:
+        return self.AFM_LLM_MODEL
+
+    @property
+    def llm_base_url(self) -> str:
+        return self.AFM_LLM_BASE_URL
+
+    @property
+    def llm_timeout_s(self) -> int:
+        return self.AFM_LLM_TIMEOUT_S
+
+    @property
+    def llm_max_new_tokens(self) -> int:
+        return self.AFM_LLM_MAX_NEW_TOKENS
+
+    @property
+    def embedding_threshold(self) -> float:
+        return self.EMBEDDING_THRESHOLD
+
+    @property
+    def format_similarity_threshold(self) -> float:
+        return self.FORMAT_SIMILARITY_THRESHOLD
+
+    @property
+    def store_raw_row_json(self) -> bool:
+        return self.STORE_RAW_ROW_JSON
+
+    @property
+    def parser_version(self) -> str:
+        return self.PARSER_VERSION
+
+    @property
+    def max_meta_lookback_rows(self) -> int:
+        return self.MAX_META_LOOKBACK_ROWS
+
+    @property
     def ingestion_settings(self) -> Settings:
         return Settings(
             pg_dsn=self.sync_pg_dsn,
