@@ -1,4 +1,5 @@
 .venv/
+venv/
 data/
 *.xlsx
 *.csv
@@ -6,3 +7,4 @@ data/
 __pycache__/
 .DS_Store
 .env
+server*.log

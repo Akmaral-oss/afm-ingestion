@@ -54,6 +54,15 @@ class IngestionPipeline:
         self.extractor = ExcelUniversalExtractor()
         self.meta_extractor = StatementMetadataExtractor()
 
+    def close(self) -> None:
+        self.engine.dispose()
+
+    def __enter__(self) -> "IngestionPipeline":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     def _find_adapter(self, bank: str):
         for a in self.adapters:
             if getattr(a, "bank_name", None) == bank:

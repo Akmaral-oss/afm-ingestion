@@ -1,6 +1,88 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 
-# Intentionally minimal. Entrypoint is scripts/ingest_cli.py
-def run() -> None:
-    raise SystemExit("Use scripts/ingest_cli.py")
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqladmin import Admin, ModelView
+from starlette.middleware.sessions import SessionMiddleware
+
+from app.admin_auth import AdminAuth
+from app.config import settings
+from app.database import Base, async_session, engine
+from app.models import Transaction, TransactionUploadMeta, User
+from app.routers import analytics, auth, chat, transactions
+from app.seed import seed_admin_if_missing
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    if settings.ENABLE_SEED:
+        async with async_session() as session:
+            await seed_admin_if_missing(session)
+
+    yield
+
+    chat.close_chat_runtime()
+    await engine.dispose()
+
+
+app = FastAPI(
+    title=settings.APP_TITLE,
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
+)
+
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class TransactionAdmin(ModelView, model=Transaction):
+    column_list = [
+        Transaction.id,
+        Transaction.date,
+        Transaction.sender_name,
+        Transaction.recipient_name,
+        Transaction.amount_tenge,
+        Transaction.currency,
+        Transaction.category,
+    ]
+
+
+class TransactionUploadMetaAdmin(ModelView, model=TransactionUploadMeta):
+    column_list = [
+        TransactionUploadMeta.tx_id,
+        TransactionUploadMeta.uploaded_by_email,
+        TransactionUploadMeta.created_at,
+    ]
+
+
+class UserAdmin(ModelView, model=User):
+    column_list = [User.id, User.email, User.role]
+    column_searchable_list = [User.email]
+    column_sortable_list = [User.id, User.email]
+
+
+admin = Admin(app, engine, authentication_backend=AdminAuth(secret_key=settings.SESSION_SECRET))
+admin.add_view(TransactionAdmin)
+admin.add_view(TransactionUploadMetaAdmin)
+admin.add_view(UserAdmin)
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(transactions.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(chat.router, prefix="/api/v1")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "afm-ingestion-api"}

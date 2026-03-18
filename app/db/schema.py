@@ -1,6 +1,32 @@
 from __future__ import annotations
+import logging
+
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
+
+
+log = logging.getLogger(__name__)
+
+
+def _is_ignorable_ddl_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return (
+        "must be owner of" in message
+        or "permission denied" in message
+        or "insufficient privilege" in message
+    )
+
+
+def _execute_optional(conn, sql: str, *, label: str) -> None:
+    try:
+        with conn.begin_nested():
+            conn.execute(text(sql))
+    except SQLAlchemyError as exc:
+        if _is_ignorable_ddl_error(exc):
+            log.warning("Skipping optional schema step '%s': %s", label, exc)
+            return
+        raise
 
 
 def ensure_schema(engine: Engine) -> None:
@@ -170,21 +196,61 @@ def ensure_schema(engine: Engine) -> None:
             )
         )
 
-        conn.execute(text("ALTER TABLE afm.statements DROP COLUMN IF EXISTS contract_no;"))
-        conn.execute(text("ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS payer_bank_bic;"))
-        conn.execute(text("ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS receiver_bank_bic;"))
+        _execute_optional(
+            conn,
+            "ALTER TABLE afm.statements DROP COLUMN IF EXISTS contract_no;",
+            label="drop contract_no",
+        )
+        _execute_optional(
+            conn,
+            "ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS payer_bank_bic;",
+            label="drop payer_bank_bic",
+        )
+        _execute_optional(
+            conn,
+            "ALTER TABLE afm.transactions_core DROP COLUMN IF EXISTS receiver_bank_bic;",
+            label="drop receiver_bank_bic",
+        )
 
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_fmt_bank ON afm.format_registry(source_bank);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_stmt_file ON afm.statements(file_id);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_stmt_account ON afm.statements(account_iban);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_core_date ON afm.transactions_core(operation_date);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_core_file ON afm.transactions_core(file_id);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_stmt ON afm.transactions_core(statement_id);"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_tx_format ON afm.transactions_core(format_id);"))
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_fmt_bank ON afm.format_registry(source_bank);",
+            label="index idx_fmt_bank",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_stmt_file ON afm.statements(file_id);",
+            label="index idx_stmt_file",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_stmt_account ON afm.statements(account_iban);",
+            label="index idx_stmt_account",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_tx_core_date ON afm.transactions_core(operation_date);",
+            label="index idx_tx_core_date",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_tx_core_file ON afm.transactions_core(file_id);",
+            label="index idx_tx_core_file",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_tx_stmt ON afm.transactions_core(statement_id);",
+            label="index idx_tx_stmt",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_tx_format ON afm.transactions_core(format_id);",
+            label="index idx_tx_format",
+        )
 
-        conn.execute(
-            text(
-                """
+        _execute_optional(
+            conn,
+            """
         CREATE OR REPLACE VIEW afm.transactions_view AS
         SELECT
           tx_id,
@@ -204,6 +270,179 @@ def ensure_schema(engine: Engine) -> None:
           purpose_text,
           sdp_name
         FROM afm.transactions_core;
-        """
+        """,
+            label="refresh transactions_view",
+        )
+
+        _execute_optional(
+            conn,
+            "CREATE EXTENSION IF NOT EXISTS vector;",
+            label="extension vector",
+        )
+        vector_available = bool(
+            conn.execute(
+                text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+            ).scalar()
+        )
+
+        _execute_optional(
+            conn,
+            "ALTER TABLE afm.transactions_core ADD COLUMN IF NOT EXISTS semantic_text TEXT;",
+            label="add semantic_text",
+        )
+        _execute_optional(
+            conn,
+            (
+                "ALTER TABLE afm.transactions_core "
+                "ADD COLUMN IF NOT EXISTS semantic_embedding vector(1024);"
             )
+            if vector_available
+            else (
+                "ALTER TABLE afm.transactions_core "
+                "ADD COLUMN IF NOT EXISTS semantic_embedding BYTEA;"
+            ),
+            label="add semantic_embedding",
+        )
+        if vector_available:
+            _execute_optional(
+                conn,
+                """
+            CREATE INDEX IF NOT EXISTS idx_tx_semantic_emb
+            ON afm.transactions_core
+            USING ivfflat (semantic_embedding vector_cosine_ops)
+            WITH (lists = 100);
+            """,
+                label="index idx_tx_semantic_emb",
+            )
+
+        _execute_optional(
+            conn,
+            """
+        CREATE OR REPLACE VIEW afm.transactions_nl_view AS
+        SELECT
+          tc.tx_id,
+          tc.source_bank,
+          tc.operation_ts,
+          tc.operation_date,
+          tc.currency,
+          tc.amount_currency,
+          tc.amount_kzt,
+          tc.amount_credit,
+          tc.amount_debit,
+          tc.direction,
+          tc.operation_type_raw,
+          tc.sdp_name,
+          tc.purpose_code,
+          tc.purpose_text,
+          tc.raw_note,
+          tc.payer_name,
+          tc.payer_iin_bin,
+          tc.payer_residency,
+          tc.payer_bank,
+          tc.payer_account,
+          tc.receiver_name,
+          tc.receiver_iin_bin,
+          tc.receiver_residency,
+          tc.receiver_bank,
+          tc.receiver_account,
+          st.client_name,
+          st.client_iin_bin,
+          st.account_iban,
+          st.account_type,
+          st.statement_date,
+          st.period_from,
+          st.period_to,
+          st.opening_balance,
+          st.closing_balance,
+          st.total_debit,
+          st.total_credit,
+          COALESCE(
+            NULLIF(tc.semantic_text, ''),
+            CONCAT_WS(
+              ' | ',
+              NULLIF(tc.source_bank, ''),
+              NULLIF(tc.direction, ''),
+              NULLIF(tc.operation_type_raw, ''),
+              NULLIF(tc.sdp_name, ''),
+              NULLIF(tc.purpose_text, ''),
+              NULLIF(tc.raw_note, ''),
+              NULLIF(tc.payer_name, ''),
+              NULLIF(tc.receiver_name, '')
+            )
+          ) AS semantic_text,
+          tc.semantic_embedding
+        FROM afm.transactions_core tc
+        LEFT JOIN afm.statements st ON st.statement_id = tc.statement_id;
+        """,
+            label="refresh transactions_nl_view",
+        )
+
+        _execute_optional(
+            conn,
+            (
+                """
+            CREATE TABLE IF NOT EXISTS afm.semantic_catalog (
+              id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+              type       TEXT        NOT NULL,
+              text       TEXT        NOT NULL,
+              embedding  vector(1024),
+              meta       JSONB,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+                if vector_available
+                else
+                """
+            CREATE TABLE IF NOT EXISTS afm.semantic_catalog (
+              id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+              type       TEXT        NOT NULL,
+              text       TEXT        NOT NULL,
+              embedding  BYTEA,
+              meta       JSONB,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+            ),
+            label="create semantic_catalog",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_sem_cat_type ON afm.semantic_catalog(type);",
+            label="index idx_sem_cat_type",
+        )
+
+        _execute_optional(
+            conn,
+            (
+                """
+            CREATE TABLE IF NOT EXISTS afm.query_history (
+              id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+              question          TEXT        NOT NULL,
+              generated_sql     TEXT,
+              execution_success BOOLEAN     NOT NULL DEFAULT FALSE,
+              user_feedback     SMALLINT,
+              embedding         vector(1024),
+              created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+                if vector_available
+                else
+                """
+            CREATE TABLE IF NOT EXISTS afm.query_history (
+              id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+              question          TEXT        NOT NULL,
+              generated_sql     TEXT,
+              execution_success BOOLEAN     NOT NULL DEFAULT FALSE,
+              user_feedback     SMALLINT,
+              embedding         BYTEA,
+              created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+            ),
+            label="create query_history",
+        )
+        _execute_optional(
+            conn,
+            "CREATE INDEX IF NOT EXISTS idx_qh_success ON afm.query_history(execution_success);",
+            label="index idx_qh_success",
         )

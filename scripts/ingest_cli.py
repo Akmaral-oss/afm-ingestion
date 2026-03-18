@@ -80,24 +80,24 @@ def main():
         store_raw_row_json=args.rawjson,
     )
 
-    pipe = IngestionPipeline(settings)
+    with IngestionPipeline(settings) as pipe:
 
-    # -------- MODE 1: folder ingestion --------
-    if args.data:
+        # -------- MODE 1: folder ingestion --------
+        if args.data:
 
-        pipe.ingest_data_folder(args.data)
+            pipe.ingest_data_folder(args.data)
 
-    # -------- MODE 2: file ingestion --------
-    elif args.files:
+        # -------- MODE 2: file ingestion --------
+        elif args.files:
 
-        for f in args.files:
-            pipe.ingest_file(f, source_bank=args.bank)
+            for f in args.files:
+                pipe.ingest_file(f, source_bank=args.bank)
 
-    else:
+        else:
 
-        raise SystemExit(
-            "Provide either --data <folder> or XLSX files"
-        )
+            raise SystemExit(
+                "Provide either --data <folder> or XLSX files"
+            )
 
 
 if __name__ == "__main__":
