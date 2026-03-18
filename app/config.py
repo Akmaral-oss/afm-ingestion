@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,8 +22,8 @@ class Settings:
 class ApiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    DATABASE_URL: str = "postgresql+asyncpg://afm_user:123!@136.113.11.117:5432/afmdb?ssl=prefer"
-    PG_DSN: str = ""
+    DATABASE_URL: str = Field("postgresql+asyncpg://afm_user:123!@136.113.11.117:5432/afmdb?ssl=prefer", validation_alias="DATABASE_URL")
+    PG_DSN: str = Field("", validation_alias="AFM_PG_DSN")
 
     APP_TITLE: str = "AFM Ingestion API"
     APP_VERSION: str = "1.0.0"
