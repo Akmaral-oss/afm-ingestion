@@ -13,19 +13,13 @@ class PostgresWriter:
         self.engine = engine
         self.parser_version = parser_version
 
-    # ── raw_files ─────────────────────────────────────────────────────────────
-
-    def insert_raw_file(
-        self, file_id: str, source_bank: str, filename: str, sha256: str
-    ) -> None:
+    def insert_raw_file(self, file_id: str, source_bank: str, filename: str, sha256: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     """
-                    INSERT INTO afm.raw_files
-                      (file_id, source_bank, original_filename, sha256, parser_version)
-                    VALUES
-                      (CAST(:file_id AS uuid), :source_bank, :filename, :sha256, :parser_version)
+                    INSERT INTO afm.raw_files(file_id, source_bank, original_filename, sha256, parser_version)
+                    VALUES (CAST(:file_id AS uuid), :source_bank, :filename, :sha256, :parser_version)
                     ON CONFLICT (file_id) DO NOTHING;
                     """
                 ),
@@ -41,33 +35,20 @@ class PostgresWriter:
     def mark_parsed(self, file_id: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(
-                text(
-                    "UPDATE afm.raw_files SET parsed_at = now() "
-                    "WHERE file_id = CAST(:file_id AS uuid);"
-                ),
+                text("UPDATE afm.raw_files SET parsed_at = now() WHERE file_id = CAST(:file_id AS uuid);"),
                 {"file_id": file_id},
             )
-
-    # ── format_registry ───────────────────────────────────────────────────────
 
     def get_format_by_fingerprint(self, fingerprint: str) -> Optional[str]:
         with self.engine.begin() as conn:
             r = conn.execute(
-                text(
-                    "SELECT format_id::text FROM afm.format_registry "
-                    "WHERE header_fingerprint = :h;"
-                ),
+                text("SELECT format_id::text FROM afm.format_registry WHERE header_fingerprint = :h;"),
                 {"h": fingerprint},
             ).scalar()
             return str(r) if r else None
 
-    def load_format_vectors(
-        self, source_bank: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        sql = (
-            "SELECT format_id::text, source_bank, header_fingerprint, embedding_vector "
-            "FROM afm.format_registry"
-        )
+    def load_format_vectors(self, source_bank: Optional[str] = None) -> List[Dict[str, Any]]:
+        sql = "SELECT format_id::text, source_bank, header_fingerprint, embedding_vector FROM afm.format_registry"
         params: Dict[str, Any] = {}
         if source_bank:
             sql += " WHERE source_bank = :b"
@@ -83,7 +64,7 @@ class PostgresWriter:
                     """
                     UPDATE afm.format_registry
                     SET usage_count = usage_count + 1,
-                        last_seen   = now()
+                        last_seen = now()
                     WHERE format_id = CAST(:fid AS uuid);
                     """
                 ),
@@ -98,39 +79,43 @@ class PostgresWriter:
         header_sample: dict,
         embedding_vector: bytes | None,
     ) -> None:
+        payload = {
+            "format_id": format_id,
+            "source_bank": source_bank,
+            "fp": fp,
+            "hs": safe_json(header_sample),
+            "ev": embedding_vector,
+        }
+
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     """
-                    INSERT INTO afm.format_registry
-                      (format_id, source_bank, header_fingerprint, header_sample, embedding_vector)
-                    VALUES
-                      (CAST(:format_id AS uuid), :source_bank, :fp,
-                       CAST(:hs AS jsonb), :ev)
+                    INSERT INTO afm.format_registry(
+                        format_id, source_bank, header_fingerprint, header_sample, embedding_vector
+                    ) VALUES (
+                        CAST(:format_id AS uuid),
+                        :source_bank,
+                        :fp,
+                        CAST(:hs AS jsonb),
+                        :ev
+                    )
                     ON CONFLICT (header_fingerprint) DO NOTHING;
                     """
                 ),
-                {
-                    "format_id": format_id,
-                    "source_bank": source_bank,
-                    "fp": fp,
-                    "hs": safe_json(header_sample),
-                    "ev": embedding_vector,
-                },
+                payload,
             )
-
-    # ── statements ────────────────────────────────────────────────────────────
 
     def insert_statement(self, row: Dict[str, Any]) -> None:
         r = dict(row)
         r["meta_json"] = safe_json(r.get("meta_json") or {})
+
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     """
                     INSERT INTO afm.statements(
-                      statement_id, file_id, source_bank, source_sheet, source_block_id,
-                      format_id,
+                      statement_id, file_id, source_bank, source_sheet, source_block_id, format_id,
                       client_name, client_iin_bin, account_iban, account_type, currency,
                       statement_date, period_from, period_to,
                       opening_balance, closing_balance, total_debit, total_credit,
@@ -152,61 +137,26 @@ class PostgresWriter:
                 r,
             )
 
-    # ── transactions_core ─────────────────────────────────────────────────────
-
     def bulk_insert_core_dedup(self, rows: List[Dict[str, Any]]) -> None:
-        """
-        Bulk-insert transaction rows with dedup on row_hash.
-
-        Handles two new optional columns:
-          • semantic_text      TEXT
-          • semantic_embedding VECTOR(1024)   (stored as pgvector literal string)
-
-        Rows that have neither field set (older callers / embedder disabled)
-        are still inserted correctly — those columns default to NULL.
-        """
         if not rows:
             return
 
-        # Determine which columns are actually present in the first row.
-        # semantic_text / semantic_embedding may or may not be there.
-        base_cols = [c for c in rows[0].keys()
-                     if c not in ("semantic_text", "semantic_embedding")]
-
-        has_semantic_text = "semantic_text" in rows[0]
-        has_embedding     = "semantic_embedding" in rows[0]
-
-        all_cols = base_cols[:]
-        if has_semantic_text:
-            all_cols.append("semantic_text")
-        if has_embedding:
-            all_cols.append("semantic_embedding")
-
-        # Build value placeholders — embedding needs an explicit CAST
-        def _placeholder(col: str) -> str:
-            if col == "semantic_embedding":
-                return "CAST(:semantic_embedding AS vector)"
-            return f":{col}"
-
-        placeholders = ", ".join(_placeholder(c) for c in all_cols)
-        col_list     = ", ".join(all_cols)
-
+        cols = list(rows[0].keys())
         sql = f"""
-        INSERT INTO afm.transactions_core ({col_list})
-        VALUES ({placeholders})
+        INSERT INTO afm.transactions_core ({', '.join(cols)})
+        VALUES ({', '.join([f':{c}' for c in cols])})
         ON CONFLICT (row_hash) DO NOTHING;
         """
 
         with self.engine.begin() as conn:
             conn.execute(text(sql), rows)
 
-    # ── transactions_ext ──────────────────────────────────────────────────────
-
     def bulk_insert_ext(self, rows: List[Dict[str, Any]]) -> None:
         if not rows:
             return
         for r in rows:
             r["ext_json"] = safe_json(r["ext_json"])
+
         with self.engine.begin() as conn:
             conn.execute(
                 text(
@@ -219,13 +169,10 @@ class PostgresWriter:
                 rows,
             )
 
-    # ── field_discovery_log ───────────────────────────────────────────────────
-
     def insert_discovery(self, records: List[Dict[str, Any]]) -> None:
         if not records:
             return
 
-        # dedup within batch
         dedup: Dict[tuple, Dict[str, Any]] = {}
         for r in records:
             key = (r["file_id"], r["raw_column_name"], r.get("format_id"))
