@@ -57,6 +57,7 @@ _SEMANTIC_KEYWORDS: dict[str, str] = {
     r"покупк|purchase|магазин|shop": "purchase",
     r"штраф|пеня|penalty|fine": "penalty",
     r"аренд|rent|лизинг|lease": "rent_lease",
+    r"недвижимост|квартир|ипотек|жиль|real estate|property": "real_estate",
     r"страхован|insurance": "insurance",
     r"дивиденд|dividend": "dividend",
     r"возврат|refund|возмещ": "refund",
