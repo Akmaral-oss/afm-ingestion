@@ -15,8 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.config import load_settings_from_env
-from app.db.engine import make_engine
+from app.config import settings
+from app.database import engine
 from app.db.schema import ensure_schema
 from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
 from app.nl2sql.query_service import QueryService
@@ -127,8 +127,6 @@ with st.sidebar:
 
 @st.cache_resource(ttl="1h")
 def get_query_service():
-	settings = load_settings_from_env(str(PROJECT_ROOT / ".env"))
-	engine = make_engine(settings.pg_dsn)
 	ensure_schema(engine)
 
 	embedder = EmbeddingBackend(
