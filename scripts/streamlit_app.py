@@ -607,10 +607,10 @@ if user_message:
 					base_text = f"\n\n**Results ({len(result.rows)} rows)**"
 					
 					if result.rows:
-						with st.spinner("AI is summarizing the data..."):
-							answer_prompt = f"User asked: {user_message}\nSQL generated: {result.sql}\nData sample:\n{result.rows[:10]}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
-							ai_answer = service.generator.backend.generate(answer_prompt, max_new_tokens=400)
-						response_text = f"{ai_answer}{base_text}"
+						if result.ai_summary:
+							response_text = f"{result.ai_summary}{base_text}"
+						else:
+							response_text = f"Here are the details you requested.{base_text}"
 					else:
 						response_text = f"No data found for your query.{base_text}"
 

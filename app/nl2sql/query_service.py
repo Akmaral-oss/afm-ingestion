@@ -53,6 +53,7 @@ class QueryResult:
     repaired: bool = False
     error: Optional[str] = None
     history_id: Optional[str] = None
+    ai_summary: Optional[str] = None
 
     @property
     def success(self) -> bool:
@@ -173,6 +174,14 @@ class QueryService:
             self._save_history(result, query_embedding)
             return result
 
+        ai_summary = None
+        if rows:
+            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{rows[:10]}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
+            try:
+                ai_summary = self.generator.backend.generate(sum_prompt, max_new_tokens=400)
+            except Exception as e:
+                log.error("Failed to generate AI summary: %s", e)
+
         elapsed = time.perf_counter() - t0
         result = QueryResult(
             question=question,
@@ -181,6 +190,7 @@ class QueryService:
             execution_time_s=elapsed,
             repaired=repaired,
             history_id=str(uuid.uuid4()),
+            ai_summary=ai_summary,
         )
         self._save_history(result, query_embedding)
         return result

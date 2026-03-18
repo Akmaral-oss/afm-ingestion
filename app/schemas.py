@@ -252,3 +252,4 @@ class ChatQueryResponse(BaseModel):
     execution_time_s: float
     repaired: bool = False
     error: Optional[str] = None
+    ai_summary: Optional[str] = None

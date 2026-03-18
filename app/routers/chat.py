@@ -123,4 +123,5 @@ async def chat_query(
         execution_time_s=result.execution_time_s,
         repaired=result.repaired,
         error=result.error,
+        ai_summary=result.ai_summary,
     )
