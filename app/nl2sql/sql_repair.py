@@ -42,3 +42,8 @@ class SQLRepair:
         prompt = _REPAIR_TEMPLATE.format(sql=sql, error=error)
         log.info("Attempting SQL repair. Error: %s", error[:200])
         return self.generator.generate(prompt)
+
+    async def arepair(self, sql: str, error: str) -> str:
+        prompt = _REPAIR_TEMPLATE.format(sql=sql, error=error)
+        log.info("Attempting async SQL repair. Error: %s", error[:200])
+        return await self.generator.agenerate(prompt)

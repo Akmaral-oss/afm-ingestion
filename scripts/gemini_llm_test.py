@@ -31,7 +31,7 @@ def generate(user_text: str, model: str = "gemini-3-flash-preview") -> None:
     ]
     generate_content_config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(
-            thinking_level="HIGH",
+            thinking_level="LOW",
         ),
         safety_settings=[
             types.SafetySetting(

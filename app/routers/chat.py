@@ -30,11 +30,12 @@ def _runtime_settings() -> ApiSettings:
     return ApiSettings()
 
 
-def _runtime_signature(runtime_settings: ApiSettings) -> tuple[str, str, str, str, bool, bool]:
+def _runtime_signature(runtime_settings: ApiSettings) -> tuple[str, str, str, str, str, bool, bool]:
     return (
         runtime_settings.sync_pg_dsn,
         runtime_settings.AFM_LLM_BASE_URL,
         runtime_settings.AFM_LLM_MODEL,
+        runtime_settings.AFM_INTENT_LLM_MODEL or "",
         runtime_settings.nl2sql_embedding_model or "",
         runtime_settings.NL2SQL_SAVE_HISTORY,
         runtime_settings.NL2SQL_ADMIN_ONLY,
@@ -66,7 +67,7 @@ def _require_chat_access(authorization: Optional[str], runtime_settings: ApiSett
 
 
 @lru_cache(maxsize=1)
-def _get_runtime(_: tuple[str, str, str, str, bool, bool]) -> NL2SQLRuntime:
+def _get_runtime(_: tuple[str, str, str, str, str, bool, bool]) -> NL2SQLRuntime:
     runtime_settings = _runtime_settings()
     engine = make_engine(runtime_settings.sync_pg_dsn)
     ensure_schema(engine)
@@ -82,10 +83,19 @@ def _get_runtime(_: tuple[str, str, str, str, bool, bool]) -> NL2SQLRuntime:
         base_url=runtime_settings.AFM_LLM_BASE_URL,
         timeout_s=runtime_settings.AFM_LLM_TIMEOUT_S,
     )
+    intent_backend = None
+    if runtime_settings.AFM_INTENT_LLM_MODEL:
+        intent_backend = build_llm_backend(
+            runtime_settings.AFM_INTENT_LLM_MODEL,
+            base_url=runtime_settings.AFM_LLM_BASE_URL,
+            timeout_s=runtime_settings.AFM_LLM_TIMEOUT_S,
+        )
+
     service = QueryService.build(
         engine,
         embedder,
-        llm_backend,
+        llm_backend=llm_backend,
+        intent_backend=intent_backend,
         save_history=runtime_settings.NL2SQL_SAVE_HISTORY,
         max_new_tokens=runtime_settings.AFM_LLM_MAX_NEW_TOKENS,
     )
@@ -114,7 +124,7 @@ async def chat_query(
         )
 
     runtime = _get_runtime(_runtime_signature(runtime_settings))
-    result = await run_in_threadpool(runtime.service.run, question)
+    result = await runtime.service.run(question)
     return ChatQueryResponse(
         success=result.success,
         question=result.question,
@@ -125,3 +135,36 @@ async def chat_query(
         error=result.error,
         ai_summary=result.ai_summary,
     )
+
+
+from fastapi.responses import StreamingResponse
+import json
+
+@router.post("/stream")
+async def chat_stream(
+    body: ChatQueryRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    runtime_settings = _runtime_settings()
+    _require_chat_access(authorization, runtime_settings)
+
+    question = body.question.strip()
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question must not be empty",
+        )
+
+    runtime = _get_runtime(_runtime_signature(runtime_settings))
+
+    async def sse_generator():
+        try:
+            async for chunk in runtime.service.run_stream(question):
+                # Standard SSE format: data: JSON\n\n
+                data_str = json.dumps(chunk, default=str)
+                yield f"data: {data_str}\n\n"
+        except Exception as e:
+            err_str = json.dumps({"event": "error", "error": str(e)})
+            yield f"data: {err_str}\n\n"
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")

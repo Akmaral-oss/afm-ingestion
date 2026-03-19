@@ -29,6 +29,14 @@ _CODE_FENCE_RE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE
 class LLMBackend(ABC):
     @abstractmethod
     def generate(self, prompt: str, max_new_tokens: int = 512) -> str: ...
+    
+    @abstractmethod
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str: ...
+
+    async def astream(self, prompt: str, max_new_tokens: int = 512):
+        """Async generator yielding chunks."""
+        yield await self.agenerate(prompt, max_new_tokens)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +77,43 @@ class OllamaBackend(LLMBackend):
         )
         resp.raise_for_status()
         return resp.json()["response"]
+
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+        import httpx
+        timeout = httpx.Timeout(self.timeout_s) if self.timeout_s else None
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"num_predict": max_new_tokens},
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["response"]
+
+    async def astream(self, prompt: str, max_new_tokens: int = 512):
+        import httpx
+        import json
+        timeout = httpx.Timeout(self.timeout_s) if self.timeout_s else None
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": True,
+                    "options": {"num_predict": max_new_tokens},
+                },
+            ) as response:
+                response.raise_for_status()
+                async for chunk in response.aiter_lines():
+                    if chunk:
+                        payload = json.loads(chunk)
+                        yield payload.get("response", "")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,6 +199,36 @@ class GeminiBackend(LLMBackend):
             raise RuntimeError("Gemini returned empty output.")
         return output
 
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+        # For simplicity, wrap synchronous generator in an executor or use native async if available
+        import asyncio
+        return await asyncio.to_thread(self.generate, prompt, max_new_tokens)
+
+    async def astream(self, prompt: str, max_new_tokens: int = 512):
+        try:
+            from google import genai  # type: ignore
+            from google.genai import types  # type: ignore
+        except Exception as exc:
+            raise RuntimeError("google-genai is not installed.") from exc
+
+        api_key = os.environ.get(self.api_key_env)
+        client = genai.Client(api_key=api_key)
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+        
+        # We need async client for true streaming, but genai library might not support it cleanly
+        # So we'll just yield the full generation as a single chunk if async streaming isn't natively trivial
+        import asyncio
+        # google.genai currently offers client.aio.models.generate_content_stream
+        if hasattr(client, "aio"):
+            async for chunk in await client.aio.models.generate_content_stream(
+                model=self.model, contents=contents
+            ):
+                text_chunk = getattr(chunk, "text", None)
+                if text_chunk:
+                    yield text_chunk
+        else:
+            yield await self.agenerate(prompt, max_new_tokens)
+
 
 def build_llm_backend(
     model_name: str,
@@ -209,6 +284,13 @@ class HuggingFaceBackend(LLMBackend):
         out = self._pipe(prompt, max_new_tokens=max_new_tokens, do_sample=False)
         return out[0]["generated_text"][len(prompt):]
 
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+        import asyncio
+        return await asyncio.to_thread(self.generate, prompt, max_new_tokens)
+
+    async def astream(self, prompt: str, max_new_tokens: int = 512):
+        yield await self.agenerate(prompt, max_new_tokens)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SQL Generator
@@ -221,6 +303,10 @@ class SQLGenerator:
 
     def generate(self, prompt: str) -> str:
         raw = self.backend.generate(prompt, max_new_tokens=self.max_new_tokens)
+        return self._clean(raw)
+
+    async def agenerate(self, prompt: str) -> str:
+        raw = await self.backend.agenerate(prompt, max_new_tokens=self.max_new_tokens)
         return self._clean(raw)
 
     # ── helpers ───────────────────────────────────────────────────────────────

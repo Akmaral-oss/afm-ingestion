@@ -61,6 +61,7 @@ class ApiSettings(BaseSettings):
     AFM_LLM_MODEL: str = "qwen2.5-coder:14b"
     AFM_LLM_TIMEOUT_S: int = 120
     AFM_LLM_MAX_NEW_TOKENS: int = 512
+    AFM_INTENT_LLM_MODEL: Optional[str] = None
     NL2SQL_SAVE_HISTORY: bool = True
     NL2SQL_ADMIN_ONLY: bool = True
 
@@ -132,6 +133,10 @@ class ApiSettings(BaseSettings):
     @property
     def llm_max_new_tokens(self) -> int:
         return self.AFM_LLM_MAX_NEW_TOKENS
+
+    @property
+    def intent_llm_model(self) -> Optional[str]:
+        return self.AFM_INTENT_LLM_MODEL
 
     @property
     def embedding_threshold(self) -> float:

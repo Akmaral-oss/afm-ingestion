@@ -140,11 +140,19 @@ def get_query_service():
 		base_url=settings.llm_base_url,
 		timeout_s=settings.llm_timeout_s,
 	)
-	
+	intent_backend = None
+	if settings.AFM_INTENT_LLM_MODEL:
+		intent_backend = build_llm_backend(
+			model_name=settings.AFM_INTENT_LLM_MODEL,
+			base_url=settings.llm_base_url,
+			timeout_s=settings.llm_timeout_s,
+		)
+
 	service = QueryService.build(
 		engine,
 		embedder,
 		llm_backend,
+		intent_backend=intent_backend,
 		max_new_tokens=settings.llm_max_new_tokens,
 	)
 	return service
@@ -594,7 +602,8 @@ if user_message:
 			service.repair.max_attempts = st.session_state.get("retry_attempts", 2)
 			
 			try:
-				result = service.run(user_message)
+				import asyncio
+				result = asyncio.run(service.run(user_message))
 				
 				if result.error:
 					response_text = f"**Error:**\n```text\n{result.error}\n```"
@@ -602,11 +611,13 @@ if user_message:
 				else:
 					repaired_msg = " *(Auto-repaired)*" if result.repaired else ""
 					sql_header = f"**Generated SQL ({result.execution_time_s:.2f}s){repaired_msg}**"
-					sql_block = f"```sql\n{result.sql}\n```"
-					
+					sql_block = f"```sql\n{result.sql}\n```" if result.sql else None
+
 					base_text = f"\n\n**Results ({len(result.rows)} rows)**"
 					
-					if result.rows:
+					if not result.sql and result.ai_summary:
+						response_text = result.ai_summary
+					elif result.rows:
 						if result.ai_summary:
 							response_text = f"{result.ai_summary}{base_text}"
 						else:

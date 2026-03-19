@@ -91,6 +91,7 @@ class QueryService:
         engine: Engine,
         embedder,
         llm_backend: LLMBackend,
+        intent_backend: Optional[LLMBackend] = None,
         save_history: bool = True,
         max_new_tokens: int = 512,
     ) -> "QueryService":
@@ -98,7 +99,7 @@ class QueryService:
         repair = SQLRepair(generator)
         retriever = SemanticRetriever(engine, embedder)
         executor = QueryExecutor(engine)
-        return cls(
+        instance = cls(
             generator=generator,
             repair=repair,
             retriever=retriever,
@@ -107,16 +108,36 @@ class QueryService:
             engine=engine,
             save_history=save_history,
         )
+        instance.intent_backend = intent_backend
+        return instance
 
     # ── main entry point ──────────────────────────────────────────────────────
 
-    def run(self, question: str) -> QueryResult:
+    async def run(self, question: str) -> QueryResult:
+        import asyncio
         t0 = time.perf_counter()
         repaired = False
         sql = ""
         rows: List[Dict[str, Any]] = []
 
         try:
+            # 0. optional intent routing
+            if hasattr(self, 'intent_backend') and self.intent_backend is not None:
+                intent_prompt = (
+                    f"Message: {question}\n\n"
+                    "Classify this message. If it is a greeting, a thank you, or general chat, reply EXACTLY with 'CHAT'. "
+                    "If it is asking for data, reports, transactions, or stats, reply EXACTLY with 'DATA'."
+                )
+                classification = await self.intent_backend.agenerate(intent_prompt, max_new_tokens=10)
+                if "CHAT" in classification.upper() and "DATA" not in classification.upper():
+                    chat_prompt = f"User said: {question}\nReply as a helpful data assistant. Keep it short."
+                    ai_reply = await self.intent_backend.agenerate(chat_prompt, max_new_tokens=400)
+                    elapsed = time.perf_counter() - t0
+                    return QueryResult(
+                        question=question, sql="", rows=[], execution_time_s=elapsed,
+                        ai_summary=ai_reply, history_id=str(uuid.uuid4())
+                    )
+
             # 1. rule-based entity extraction
             entities = extract_entities(question)
             log.debug("Extracted entities: %s", entities)
@@ -125,10 +146,12 @@ class QueryService:
             query_embedding = None
             if self.embedder.enabled:
                 embed_text = entities.semantic_topic or question
-                query_embedding = self.embedder.embed([embed_text])[0]
+                query_embedding = await asyncio.to_thread(self.embedder.embed, [embed_text])
+                query_embedding = query_embedding[0]
 
             # 3. semantic retrieval
-            context = self.retriever.retrieve(
+            context = await asyncio.to_thread(
+                self.retriever.retrieve,
                 question,
                 semantic_topic=entities.semantic_topic,
             )
@@ -144,22 +167,24 @@ class QueryService:
             log.debug("Prompt length: %d chars", len(prompt))
 
             # 5. LLM SQL generation
-            sql = self.generator.generate(prompt)
+            sql = await self.generator.agenerate(prompt)
             log.info("Generated SQL:\n%s", sql)
 
             # 6. validate
             validate_sql(sql)
 
             # 7. execute
-            rows = self.executor.execute(
-                sql,
-                query_embedding=query_embedding if ":query_embedding" in sql else None,
-            )
+            def _execute():
+                return self.executor.execute(
+                    sql,
+                    query_embedding=query_embedding if ":query_embedding" in sql else None,
+                )
+            rows = await asyncio.to_thread(_execute)
 
         except SQLValidationError as ve:
             # attempt repair
             log.warning("Validation failed: %s — attempting repair", ve)
-            sql, rows, repaired = self._repair_and_run(sql, str(ve), query_embedding)
+            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding)
 
         except Exception as exc:
             elapsed = time.perf_counter() - t0
@@ -171,14 +196,30 @@ class QueryService:
                 error=str(exc),
                 history_id=str(uuid.uuid4()),
             )
-            self._save_history(result, query_embedding)
+            await asyncio.to_thread(self._save_history, result, query_embedding)
             return result
 
         ai_summary = None
         if rows:
-            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{rows[:10]}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
+            # Smart Data Summarization via Profiling
+            if len(rows) > 0:
+                try:
+                    import pandas as pd
+                    df = pd.DataFrame(rows)
+                    if len(rows) > 15:
+                        # Extract basic stats dynamically
+                        stats = df.describe(include='all').to_string()
+                        data_context = f"Data Statistics (Too large to show all):\n{stats}\nTop 5 rows:\n{df.head(5).to_dict(orient='records')}"
+                    else:
+                        data_context = str(rows)
+                except Exception:
+                    data_context = str(rows[:10])
+            else:
+                data_context = "No results."
+
+            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{data_context}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
             try:
-                ai_summary = self.generator.backend.generate(sum_prompt, max_new_tokens=400)
+                ai_summary = await self.generator.backend.agenerate(sum_prompt, max_new_tokens=400)
             except Exception as e:
                 log.error("Failed to generate AI summary: %s", e)
 
@@ -192,23 +233,143 @@ class QueryService:
             history_id=str(uuid.uuid4()),
             ai_summary=ai_summary,
         )
-        self._save_history(result, query_embedding)
+        await asyncio.to_thread(self._save_history, result, query_embedding)
         return result
+
+    async def run_stream(self, question: str):
+        """Streaming version of run(). Yields partial progress dictionary objects."""
+        import asyncio
+        import pandas as pd
+        t0 = time.perf_counter()
+        repaired = False
+        sql = ""
+        rows: List[Dict[str, Any]] = []
+        query_embedding = None
+
+        yield {"event": "status", "data": "Initializing..."}
+
+        try:
+            # 0. optional intent routing
+            if hasattr(self, 'intent_backend') and self.intent_backend is not None:
+                intent_prompt = (
+                    f"Message: {question}\n\n"
+                    "Classify this message. If it is a greeting, a thank you, or general chat, reply EXACTLY with 'CHAT'. "
+                    "If it is asking for data, reports, transactions, or stats, reply EXACTLY with 'DATA'."
+                )
+                yield {"event": "status", "data": "Checking intent..."}
+                classification = await self.intent_backend.agenerate(intent_prompt, max_new_tokens=10)
+                if "CHAT" in classification.upper() and "DATA" not in classification.upper():
+                    chat_prompt = f"User said: {question}\nReply as a helpful data assistant. Keep it short."
+                    
+                    yield {"event": "status", "data": "Generating chat response..."}
+                    ai_reply = ""
+                    async for chunk in self.intent_backend.astream(chat_prompt, max_new_tokens=400):
+                        ai_reply += chunk
+                        yield {"event": "summary_chunk", "data": chunk}
+                        
+                    elapsed = time.perf_counter() - t0
+                    yield {"event": "done", "data": {
+                        "question": question, "sql": "", "rows": [], "execution_time_s": elapsed,
+                        "ai_summary": ai_reply, "history_id": str(uuid.uuid4())
+                    }}
+                    return
+
+            yield {"event": "status", "data": "Extracting entities..."}
+            entities = extract_entities(question)
+
+            if self.embedder.enabled:
+                yield {"event": "status", "data": "Embedding question..."}
+                embed_text = entities.semantic_topic or question
+                query_embedding = await asyncio.to_thread(self.embedder.embed, [embed_text])
+                query_embedding = query_embedding[0]
+
+            yield {"event": "status", "data": "Retrieving context..."}
+            context = await asyncio.to_thread(self.retriever.retrieve, question, semantic_topic=entities.semantic_topic)
+
+            plan = QueryPlan(question=question, entities=entities, context=context, query_embedding=query_embedding)
+            prompt = build_prompt(plan)
+
+            yield {"event": "status", "data": "Generating SQL..."}
+            sql = await self.generator.agenerate(prompt)
+            
+            yield {"event": "sql", "data": sql}
+            validate_sql(sql)
+
+            yield {"event": "status", "data": "Executing query..."}
+            def _execute():
+                return self.executor.execute(sql, query_embedding=query_embedding if ":query_embedding" in sql else None)
+            rows = await asyncio.to_thread(_execute)
+
+        except SQLValidationError as ve:
+            yield {"event": "status", "data": "Repairing SQL..."}
+            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding)
+            yield {"event": "sql", "data": sql}
+
+        except Exception as exc:
+            yield {"event": "error", "error": str(exc)}
+            elapsed = time.perf_counter() - t0
+            result = QueryResult(question=question, sql=sql, rows=[], execution_time_s=elapsed, error=str(exc), history_id=str(uuid.uuid4()))
+            await asyncio.to_thread(self._save_history, result, query_embedding)
+            yield {"event": "done", "data": result.__dict__}
+            return
+
+        yield {"event": "rows", "data": rows}
+
+        ai_summary = ""
+        if rows:
+            yield {"event": "status", "data": "Summarizing data..."}
+            if len(rows) > 0:
+                try:
+                    df = pd.DataFrame(rows)
+                    if len(rows) > 15:
+                        stats = df.describe(include='all').to_string()
+                        data_context = f"Data Statistics (Too large to show all):\n{stats}\nTop 5 rows:\n{df.head(5).to_dict(orient='records')}"
+                    else:
+                        data_context = str(rows)
+                except Exception:
+                    data_context = str(rows[:10])
+            else:
+                data_context = "No results."
+
+            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{data_context}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
+            try:
+                async for chunk in self.generator.backend.astream(sum_prompt, max_new_tokens=400):
+                    ai_summary += chunk
+                    yield {"event": "summary_chunk", "data": chunk}
+            except Exception as e:
+                log.error("Failed to generate AI summary stream: %s", e)
+
+        elapsed = time.perf_counter() - t0
+        hist_id = str(uuid.uuid4())
+        result = QueryResult(
+            question=question, sql=sql, rows=rows, execution_time_s=elapsed,
+            repaired=repaired, history_id=hist_id, ai_summary=ai_summary
+        )
+        await asyncio.to_thread(self._save_history, result, query_embedding)
+        
+        yield {"event": "done", "data": {
+            "success": True, "question": question, "sql": sql, "rows": rows,
+            "execution_time_s": elapsed, "repaired": repaired, "history_id": hist_id,
+            "ai_summary": ai_summary, "error": None
+        }}
 
     # ── repair ────────────────────────────────────────────────────────────────
 
-    def _repair_and_run(
+    async def _repair_and_run(
         self,
         original_sql: str,
         error: str,
         query_embedding,
     ):
-        repaired_sql = self.repair.repair(original_sql, error)
+        import asyncio
+        repaired_sql = await self.repair.arepair(original_sql, error)
         validate_sql(repaired_sql)
-        rows = self.executor.execute(
-            repaired_sql,
-            query_embedding=query_embedding if ":query_embedding" in repaired_sql else None,
-        )
+        def _execute():
+            return self.executor.execute(
+                repaired_sql,
+                query_embedding=query_embedding if ":query_embedding" in repaired_sql else None,
+            )
+        rows = await asyncio.to_thread(_execute)
         return repaired_sql, rows, True
 
     # ── query_history persistence ─────────────────────────────────────────────
