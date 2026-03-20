@@ -213,6 +213,17 @@ class CanonicalMapper:
                 else:
                     core[canon] = str(val).strip() if val is not None else None
 
+            # Ensure NOT NULL numeric fields are always float, never None
+            for f in ("amount_kzt", "amount_currency", "amount_credit", "amount_debit"):
+                if core.get(f) is None:
+                    core[f] = 0.0
+
+            # Ensure NOT NULL string fields are always string, never None
+            for f in ("sdp_name",):
+                if core.get(f) is None:
+                    core[f] = ""
+
+            core["direction"] = derive_direction(core)
             core["direction"] = derive_direction(core)
 
             # ── semantic_text ─────────────────────────────────────────────────

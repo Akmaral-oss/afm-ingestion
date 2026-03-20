@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView
 from starlette.middleware.sessions import SessionMiddleware
 
+from sqlalchemy import text
+
 from app.admin_auth import AdminAuth
 from app.config import settings
 from app.database import Base, async_session, async_engine as engine
@@ -18,6 +20,7 @@ from app.seed import seed_admin_if_missing
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS afm;"))
         await conn.run_sync(Base.metadata.create_all)
 
     if settings.ENABLE_SEED:

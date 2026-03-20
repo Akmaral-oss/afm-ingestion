@@ -24,7 +24,7 @@ from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import load_settings_from_env, settings
-from ..database import get_db, async_session, engine as async_engine
+from ..database import get_db, async_session, async_engine
 from ..ingestion.pipeline import IngestionPipeline
 from ..models import Transaction, TransactionUploadMeta
 from ..schemas import (
@@ -530,6 +530,24 @@ def _build_core_transaction_payload(
         return value
 
     op_dt: datetime = tx["date"]
+    # Ensure amount_tenge (amount_kzt) is always a valid float and not None/NaN
+    def _safe_float(val):
+        try:
+            f = float(val)
+            if f != f:  # check for NaN
+                return 0.0
+            return f
+        except Exception:
+            return 0.0
+
+    # Robustly get amount_tenge (amount_kzt) from tx dict
+    def _get_amount_tenge(tx):
+        for key in ("amount_tenge", "amount_kzt"):
+            v = tx.get(key)
+            if v is not None:
+                return _safe_float(v)
+        return 0.0
+
     payload = {
         "id": str(tx.get("id") or uuid4()),
         "file_id": file_id,
@@ -543,7 +561,7 @@ def _build_core_transaction_payload(
         "operation_date": op_dt.date(),
         "currency": (tx.get("currency") or "KZT").strip().upper(),
         "amount_currency": float(max(float(tx.get("debit") or 0), float(tx.get("credit") or 0))),
-        "amount_tenge": float(tx.get("amount_tenge") or 0),
+        "amount_tenge": _get_amount_tenge(tx),
         "credit": float(tx.get("credit") or 0),
         "debit": float(tx.get("debit") or 0),
         "direction": "credit" if float(tx.get("credit") or 0) > 0 else "debit",
@@ -816,7 +834,7 @@ def _parser_type_to_source_bank(parser_type: str) -> Optional[str]:
 
 
 def _run_ingestion_pipeline(file_path: str, source_bank: Optional[str]):
-    with IngestionPipeline(load_settings_from_env()) as pipeline:
+    with IngestionPipeline() as pipeline:
         return pipeline.ingest_file(file_path, source_bank=source_bank)
 
 

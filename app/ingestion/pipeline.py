@@ -77,6 +77,14 @@ def _attach_embeddings(rows: List[Dict[str, Any]], embedder: EmbeddingBackend) -
 
 
 class IngestionPipeline:
+    def __enter__(self):
+        # No special resource allocation needed, just return self
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # If any cleanup is needed (e.g., closing DB connections), do it here
+        # For now, nothing to clean up
+        pass
     def __init__(self):
         self.settings = settings
         self.adapters = load_adapters()
