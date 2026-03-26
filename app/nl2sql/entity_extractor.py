@@ -193,9 +193,9 @@ def extract_entities(question: str) -> QueryEntities:
     entities.date_range = _extract_year_range(q)
 
     # ── direction ────────────────────────────────────────────────────────────
-    if re.search(r"входящ|кредитов|credit|incoming|зачислен", q, re.I):
+    if re.search(r"входящ|кредитов|credit|incoming|зачислен|поступлен|доход|income|receipt|deposit", q, re.I):
         entities.direction = Filter("direction", "=", "credit")
-    elif re.search(r"исходящ|дебетов|debit|outgoing|списан", q, re.I):
+    elif re.search(r"исходящ|дебетов|debit|outgoing|списан|расход|трат|expense|spend|outflow|withdraw", q, re.I):
         entities.direction = Filter("direction", "=", "debit")
 
     # ── currency ─────────────────────────────────────────────────────────────

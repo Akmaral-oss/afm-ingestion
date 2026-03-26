@@ -12,6 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings:
     pg_dsn: str
     embedding_model_path: Optional[str] = None
+    embedding_provider: str = "disabled"
+    embedding_base_url: str = "http://localhost:11434"
+    embedding_timeout_s: int = 60
     embedding_threshold: float = 0.85
     format_similarity_threshold: float = 0.92
     store_raw_row_json: bool = False
@@ -162,7 +165,10 @@ class ApiSettings(BaseSettings):
     def ingestion_settings(self) -> Settings:
         return Settings(
             pg_dsn=self.sync_pg_dsn,
-            embedding_model_path=self.EMBEDDING_MODEL_PATH or None,
+            embedding_model_path=self.embedding_model_path,
+            embedding_provider=self.embedding_provider,
+            embedding_base_url=self.embedding_base_url,
+            embedding_timeout_s=self.embedding_timeout_s,
             embedding_threshold=self.EMBEDDING_THRESHOLD,
             format_similarity_threshold=self.FORMAT_SIMILARITY_THRESHOLD,
             store_raw_row_json=self.STORE_RAW_ROW_JSON,

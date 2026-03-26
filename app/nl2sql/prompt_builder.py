@@ -38,6 +38,8 @@ SQL RULES (strictly follow all of them):
 9.  Do not use DROP, DELETE, UPDATE, INSERT, ALTER, CREATE.
 10. Do not add explanations — output raw SQL only.
 11. Try to reason and in some null values should be excluded exclude them in cases like (Give me top transactions by amount -> AS you know top transactions don't need to be null, so add null exclusion logic in where clause)
+12. If the user asks about expenses / spending / расходы / траты, prefer direction = 'debit'.
+13. If the user asks about income / receipts / поступления / доходы, prefer direction = 'credit'.
 
 STRUCTURED FILTER RULES:
 11. If the question contains structured constraints such as date, amount, direction, currency, payer, receiver, bank, or source_bank,

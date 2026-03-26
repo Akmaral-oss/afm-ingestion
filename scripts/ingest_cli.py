@@ -126,7 +126,7 @@ def main():
         raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
 
     # --- ШАГ 3: Запуск ---
-    pipe = IngestionPipeline()
+    pipe = IngestionPipeline(final_settings.ingestion_settings)
 
     if args.data:
         pipe.ingest_data_folder(args.data)

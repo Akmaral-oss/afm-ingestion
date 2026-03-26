@@ -22,6 +22,28 @@ log = logging.getLogger(__name__)
 _CODE_FENCE_RE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
+def _raise_with_response_details(resp) -> None:
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = None
+
+    if isinstance(payload, dict):
+        message = payload.get("error") or payload.get("message")
+        if message:
+            raise RuntimeError(f"Ollama request failed: {message}")
+
+    try:
+        text = resp.text.strip()
+    except Exception:
+        text = ""
+
+    if text:
+        raise RuntimeError(f"Ollama request failed: {resp.status_code} {text}")
+
+    resp.raise_for_status()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Abstract backend
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +97,8 @@ class OllamaBackend(LLMBackend):
             },
             timeout=self.timeout_s,
         )
-        resp.raise_for_status()
+        if not resp.ok:
+            _raise_with_response_details(resp)
         return resp.json()["response"]
 
     async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
@@ -91,7 +114,8 @@ class OllamaBackend(LLMBackend):
                     "options": {"num_predict": max_new_tokens},
                 },
             )
-            resp.raise_for_status()
+            if resp.is_error:
+                _raise_with_response_details(resp)
             return resp.json()["response"]
 
     async def astream(self, prompt: str, max_new_tokens: int = 512):
@@ -109,7 +133,8 @@ class OllamaBackend(LLMBackend):
                     "options": {"num_predict": max_new_tokens},
                 },
             ) as response:
-                response.raise_for_status()
+                if response.is_error:
+                    _raise_with_response_details(response)
                 async for chunk in response.aiter_lines():
                     if chunk:
                         payload = json.loads(chunk)

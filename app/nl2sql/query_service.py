@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +39,52 @@ from .sql_repair import SQLRepair
 from .sql_validator import SQLValidationError, validate_sql
 
 log = logging.getLogger(__name__)
+
+_ORDER_BY_CLAUSE_RE = re.compile(
+    r"(\bORDER\s+BY\b)(?P<clause>.*?)(?=\bLIMIT\b|\bOFFSET\b|$)",
+    re.IGNORECASE | re.DOTALL,
+)
+_ORDER_BY_AMOUNT_RE = re.compile(
+    r"(?P<expr>(?:\b\w+\.)?amount_kzt)(?P<direction>\s+(?:ASC|DESC))?(?!\s+NULLS\s+(?:FIRST|LAST))",
+    re.IGNORECASE,
+)
+
+
+def _inject_where_predicate(sql: str, predicate: str) -> str:
+    if re.search(re.escape(predicate), sql, re.IGNORECASE):
+        return sql
+
+    if re.search(r"\bWHERE\b", sql, re.IGNORECASE):
+        return re.sub(r"\bWHERE\b", f"WHERE {predicate} AND ", sql, count=1, flags=re.IGNORECASE)
+
+    insertion_match = re.search(r"\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b", sql, re.IGNORECASE)
+    if insertion_match:
+        idx = insertion_match.start()
+        return f"{sql[:idx]}WHERE {predicate}\n{sql[idx:]}"
+
+    stripped = sql.rstrip().rstrip(";")
+    return f"{stripped}\nWHERE {predicate};"
+
+
+def _normalize_ranked_amount_sql(sql: str) -> str:
+    if not re.search(r"\bORDER\s+BY\s+(?:\w+\.)?amount_kzt\b", sql, re.IGNORECASE):
+        return sql
+
+    normalized = _inject_where_predicate(sql, "amount_kzt IS NOT NULL")
+
+    order_match = _ORDER_BY_CLAUSE_RE.search(normalized)
+    if not order_match:
+        return normalized
+
+    order_clause = order_match.group("clause")
+
+    def repl(match: re.Match) -> str:
+        expr = match.group("expr")
+        direction = match.group("direction").upper() if match.group("direction") else ""
+        return f"{expr}{direction} NULLS LAST"
+
+    updated_clause = _ORDER_BY_AMOUNT_RE.sub(repl, order_clause)
+    return f"{normalized[:order_match.start('clause')]}{updated_clause}{normalized[order_match.end('clause'):]}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +215,7 @@ class QueryService:
 
             # 5. LLM SQL generation
             sql = await self.generator.agenerate(prompt)
+            sql = _normalize_ranked_amount_sql(sql)
             log.info("Generated SQL:\n%s", sql)
 
             # 6. validate
@@ -291,6 +339,7 @@ class QueryService:
 
             yield {"event": "status", "data": "Generating SQL..."}
             sql = await self.generator.agenerate(prompt)
+            sql = _normalize_ranked_amount_sql(sql)
             
             yield {"event": "sql", "data": sql}
             validate_sql(sql)
@@ -363,6 +412,7 @@ class QueryService:
     ):
         import asyncio
         repaired_sql = await self.repair.arepair(original_sql, error)
+        repaired_sql = _normalize_ranked_amount_sql(repaired_sql)
         validate_sql(repaired_sql)
         def _execute():
             return self.executor.execute(

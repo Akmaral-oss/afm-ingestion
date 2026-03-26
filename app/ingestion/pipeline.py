@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 
-from app.config import settings
+from app.config import Settings, settings
 from app.database import engine
 from app.db.schema import ensure_schema
 from app.db.writers import PostgresWriter
@@ -77,34 +77,26 @@ def _attach_embeddings(rows: List[Dict[str, Any]], embedder: EmbeddingBackend) -
 
 
 class IngestionPipeline:
-    def __enter__(self):
-        # No special resource allocation needed, just return self
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # If any cleanup is needed (e.g., closing DB connections), do it here
-        # For now, nothing to clean up
-        pass
-    def __init__(self):
-        self.settings = settings
+    def __init__(self, runtime_settings: Optional[Settings] = None):
+        self.settings = runtime_settings or settings
         self.adapters = load_adapters()
 
         self.engine = engine
         ensure_schema(self.engine)
-        self.writer = PostgresWriter(self.engine, parser_version=settings.parser_version)
+        self.writer = PostgresWriter(self.engine, parser_version=self.settings.parser_version)
 
         self.embedder = EmbeddingBackend(
-            settings.embedding_model_path,
-            provider=settings.embedding_provider,
-            ollama_base_url=settings.embedding_base_url,
-            ollama_timeout_s=settings.embedding_timeout_s,
+            self.settings.embedding_model_path,
+            provider=self.settings.embedding_provider,
+            ollama_base_url=self.settings.embedding_base_url,
+            ollama_timeout_s=self.settings.embedding_timeout_s,
         )
-        self.mapper = CanonicalMapper(self.embedder, threshold=settings.embedding_threshold)
+        self.mapper = CanonicalMapper(self.embedder, threshold=self.settings.embedding_threshold)
 
         self.format_registry = FormatRegistryService(
             writer=self.writer,
             embedder=self.embedder,
-            similarity_threshold=settings.format_similarity_threshold,
+            similarity_threshold=self.settings.format_similarity_threshold,
         )
         self.discovery = DiscoveryLogger(self.writer)
 
@@ -116,6 +108,16 @@ class IngestionPipeline:
             "ON" if self.embedder.enabled else "OFF",
             "will be computed" if self.embedder.enabled else "NULL (no model)",
         )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            self.engine.dispose()
+        except Exception:
+            log.exception("Failed to dispose sync ingestion engine")
+        return False
 
     def _find_adapter(self, bank: str):
         for a in self.adapters:
