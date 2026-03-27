@@ -17,8 +17,23 @@ services:
     restart: unless-stopped
     ports:
       - 3000:3000
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.19.0
+    container_name: postgres_exporter
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: ""
+    networks:
+      - monitoring
+    ports:
+      - "9187:9187"
     
 volumes:
   postgresdata:
   grafanadata:
   prometheusdata:
+
+networks:
+  monitoring:
+    driver: bridge

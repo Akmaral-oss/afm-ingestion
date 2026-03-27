@@ -86,7 +86,7 @@ async def chat_query(
     body: ChatQueryRequest,
     authorization: Optional[str] = Header(default=None),
 ):
-    _require_chat_access(authorization)
+    _require_chat_access(authorization, settings)
 
     question = body.question.strip()
     if not question:
@@ -111,7 +111,7 @@ async def chat_stream(
     body: ChatQueryRequest,
     authorization: Optional[str] = Header(default=None),
 ):
-    _require_chat_access(authorization)
+    _require_chat_access(authorization, settings)
 
     question = body.question.strip()
     if not question:

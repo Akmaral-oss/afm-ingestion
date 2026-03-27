@@ -7,22 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-@dataclass(frozen=True)
-class Settings:
-    pg_dsn: str
-    embedding_model_path: Optional[str] = None
-    embedding_provider: str = "disabled"
-    embedding_base_url: str = "http://localhost:11434"
-    embedding_timeout_s: int = 60
-    embedding_threshold: float = 0.85
-    format_similarity_threshold: float = 0.92
-    store_raw_row_json: bool = False
-    parser_version: str = "v2.0-enterprise"
-    max_meta_lookback_rows: int = 80
-
-
-class ApiSettings(BaseSettings):
+class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     DATABASE_URL: str = Field("postgresql+asyncpg://afm_user:123!@136.113.11.117:5432/afmdb?ssl=prefer", validation_alias="DATABASE_URL")
@@ -79,6 +64,7 @@ class ApiSettings(BaseSettings):
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
 
+
     @staticmethod
     def _to_sync_pg_dsn(dsn: str) -> str:
         if not dsn.startswith("postgresql+asyncpg://"):
@@ -113,68 +99,11 @@ class ApiSettings(BaseSettings):
     def embedding_provider(self) -> str:
         return self.AFM_EMBEDDING_PROVIDER
 
-    @property
-    def embedding_base_url(self) -> str:
-        return self.AFM_EMBEDDING_BASE_URL
-
-    @property
-    def embedding_timeout_s(self) -> int:
-        return self.AFM_EMBEDDING_TIMEOUT_S
-
-    @property
-    def llm_model_name(self) -> str:
-        return self.AFM_LLM_MODEL
-
-    @property
-    def llm_base_url(self) -> str:
-        return self.AFM_LLM_BASE_URL
-
-    @property
-    def llm_timeout_s(self) -> int:
-        return self.AFM_LLM_TIMEOUT_S
-
-    @property
-    def llm_max_new_tokens(self) -> int:
-        return self.AFM_LLM_MAX_NEW_TOKENS
-
-    @property
-    def intent_llm_model(self) -> Optional[str]:
-        return self.AFM_INTENT_LLM_MODEL
 
     @property
     def embedding_threshold(self) -> float:
         return self.EMBEDDING_THRESHOLD
 
-    @property
-    def format_similarity_threshold(self) -> float:
-        return self.FORMAT_SIMILARITY_THRESHOLD
-
-    @property
-    def store_raw_row_json(self) -> bool:
-        return self.STORE_RAW_ROW_JSON
-
-    @property
-    def parser_version(self) -> str:
-        return self.PARSER_VERSION
-
-    @property
-    def max_meta_lookback_rows(self) -> int:
-        return self.MAX_META_LOOKBACK_ROWS
-
-    @property
-    def ingestion_settings(self) -> Settings:
-        return Settings(
-            pg_dsn=self.sync_pg_dsn,
-            embedding_model_path=self.embedding_model_path,
-            embedding_provider=self.embedding_provider,
-            embedding_base_url=self.embedding_base_url,
-            embedding_timeout_s=self.embedding_timeout_s,
-            embedding_threshold=self.EMBEDDING_THRESHOLD,
-            format_similarity_threshold=self.FORMAT_SIMILARITY_THRESHOLD,
-            store_raw_row_json=self.STORE_RAW_ROW_JSON,
-            parser_version=self.PARSER_VERSION,
-            max_meta_lookback_rows=self.MAX_META_LOOKBACK_ROWS,
-        )
 
     @property
     def nl2sql_embedding_model(self) -> Optional[str]:
@@ -185,8 +114,4 @@ class ApiSettings(BaseSettings):
         return None
 
 
-settings = ApiSettings()
-
-
-def load_settings_from_env() -> Settings:
-    return settings.ingestion_settings
+settings = Settings()

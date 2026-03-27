@@ -65,9 +65,11 @@ async_session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_
 class Base(DeclarativeBase):
     pass
 
-async def get_db() -> AsyncSession:
+async def get_db():
     async with async_session() as session:
-        yield session
-
+        try:
+            yield session
+        finally:
+            await session.close()
 
     

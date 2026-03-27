@@ -9,12 +9,13 @@ Analytics endpoints:
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, and_, or_, case, literal, literal_column, cast, DateTime, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Transaction
+from app.exceptions import MissingIdentityFieldsException
 from ..schemas import (
     TimeSeriesResponse,
     TimeSeriesPoint,
@@ -488,7 +489,7 @@ async def top_expenses_transactions(
     cp_name = _fix_mojibake((name or "").strip())
 
     if not norm_iin and not norm_acc and not cp_name:
-        raise HTTPException(status_code=400, detail="iin_bin/account/name is required")
+        raise MissingIdentityFieldsException
 
     if type == "credit":
         amount_col = Transaction.credit

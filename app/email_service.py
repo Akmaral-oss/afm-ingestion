@@ -2,10 +2,8 @@ import random
 import smtplib
 from email.message import EmailMessage
 
-from fastapi import HTTPException, status
-
-from .config import settings
-
+from app.config import settings
+from app.exceptions import SMTPNotConfiguredException, EmailDeliveryException
 
 def generate_verification_code() -> str:
     return f"{random.randint(0, 999999):06d}"
@@ -13,10 +11,7 @@ def generate_verification_code() -> str:
 
 def send_registration_code(email: str, code: str) -> None:
     if not settings.SMTP_HOST or not settings.SMTP_FROM_EMAIL:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="SMTP is not configured",
-        )
+        raise SMTPNotConfiguredException
 
     message = EmailMessage()
     message["Subject"] = "FinAnalytica registration code"
@@ -42,7 +37,4 @@ def send_registration_code(email: str, code: str) -> None:
                 server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
             server.send_message(message)
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to send email: {exc}",
-        ) from exc
+        raise EmailDeliveryException from exc

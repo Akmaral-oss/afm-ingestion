@@ -9,7 +9,7 @@ POST /api/v1/auth/logout
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,16 @@ from ..schemas import (
     UserOut,
 )
 from ..security import create_access_token, hash_password, verify_password
+from app.exceptions import (
+    UserALreadyExistsException, 
+    IncorrectEmailOrPasswordException, 
+    InvalidEmailException,
+    VerificationCodeExpiredException,
+    VerificationCodeNotRequestedException,
+    InvalidVerificationCodeException,
+    RegistrationFlowRequiredException,
+    InvalidFieldException
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -48,26 +58,18 @@ def _contains_control_chars(value: str) -> bool:
 def _normalize_email(email: str) -> str:
     value = email.strip().lower()
     if not value or len(value) > 254 or _contains_control_chars(value):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid email",
-        )
+        raise InvalidEmailException
     return value
 
 
 def _validate_secret_field(value: str, field_name: str, *, min_length: int = 1, max_length: int = 256) -> str:
     if value is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {field_name}",
-        )
+        raise InvalidFieldException(field_name)
 
     normalized = value.strip()
     if len(normalized) < min_length or len(normalized) > max_length or _contains_control_chars(normalized):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {field_name}",
-        )
+        raise InvalidFieldException(field_name)
+    
     return normalized
 
 
@@ -79,10 +81,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
+        raise IncorrectEmailOrPasswordException
 
     token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
     return LoginResponse(token=token, user=_user_to_out(user))
@@ -95,10 +94,7 @@ async def register_send_code(body: RegisterSendCodeRequest, db: AsyncSession = D
 
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists",
-        )
+        raise UserALreadyExistsException
 
     code = generate_verification_code()
     now = _utc_now_naive()
@@ -139,33 +135,21 @@ async def register_confirm(body: RegisterConfirmRequest, db: AsyncSession = Depe
 
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists",
-        )
+        raise UserALreadyExistsException
 
     pending_result = await db.execute(select(PendingRegistration).where(PendingRegistration.email == email))
     pending = pending_result.scalar_one_or_none()
     if not pending:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code was not requested",
-        )
+        raise VerificationCodeNotRequestedException
 
     now = _utc_now_naive()
     if pending.expires_at < now:
         await db.delete(pending)
         await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code expired",
-        )
+        raise VerificationCodeExpiredException
 
     if pending.verification_code != code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code",
-        )
+        raise InvalidVerificationCodeException
 
     user = User(email=email, password_hash=pending.password_hash, role="user")
     db.add(user)
@@ -180,10 +164,7 @@ async def register_confirm(body: RegisterConfirmRequest, db: AsyncSession = Depe
 
 @router.post("/register", response_model=MessageResponse)
 async def register_legacy(_: RegisterRequest):
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Use /auth/register/send-code and /auth/register/confirm",
-    )
+    raise RegistrationFlowRequiredException
 
 
 @router.post("/logout", response_model=MessageResponse)

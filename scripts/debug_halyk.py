@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# scripts/debug_halylk.py
+# scripts/debug_halyk.py
 from __future__ import annotations
 
 import argparse

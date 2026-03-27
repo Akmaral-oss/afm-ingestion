@@ -104,14 +104,14 @@ def main():
 
     # --- ШАГ 1: Собираем только те аргументы, которые юзер ввел вручную ---
     overrides = {
-        "pg_dsn": args.pg,
-        "embedding_model_path": args.model,
-        "embedding_provider": args.embedding_provider,
-        "embedding_base_url": args.embedding_url,
-        "embedding_timeout_s": args.embedding_timeout,
-        "embedding_threshold": args.threshold,
-        "format_similarity_threshold": args.format_sim,
-        "store_raw_row_json": args.rawjson if args.rawjson else None,
+        "PG_DSN": args.pg,
+        "EMBEDDING_MODEL_PATH": args.model,
+        "AFM_EMBEDDING_PROVIDER": args.embedding_provider,
+        "AFM_EMBEDDING_BASE_URL": args.embedding_url,
+        "AFM_EMBEDDING_TIMEOUT_S": args.embedding_timeout,
+        "EMBEDDING_THRESHOLD": args.threshold,
+        "FORMAT_SIMILARITY_THRESHOLD": args.format_sim,
+        "STORE_RAW_ROW_JSON": args.rawjson if args.rawjson else None,
     }
 
     # Удаляем None, чтобы не затереть дефолтные настройки из .env
@@ -122,11 +122,11 @@ def main():
     final_settings = settings.model_copy(update=overrides)
 
     # Проверка критического параметра
-    if not final_settings.sync_pg_dsn:
+    if not final_settings.PG_DSN:
         raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
 
     # --- ШАГ 3: Запуск ---
-    pipe = IngestionPipeline(final_settings.ingestion_settings)
+    pipe = IngestionPipeline()
 
     if args.data:
         pipe.ingest_data_folder(args.data)
@@ -135,6 +135,7 @@ def main():
             pipe.ingest_file(f, source_bank=args.bank)
     else:
         raise SystemExit("Provide either --data <folder> or XLSX files")
+    
 
 if __name__ == "__main__":
     main()

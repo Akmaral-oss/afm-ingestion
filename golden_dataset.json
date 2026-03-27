@@ -1,0 +1,1910 @@
+[
+  {
+    "id": 1,
+    "text": "Покажи транзакции клиента с ИИН 900240001315 на сумму больше 106915 KZT от 09 января 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='900240001315' AND amount_kzt > 106915 AND operation_date>'2023-01-09';"
+  },
+  {
+    "id": 2,
+    "text": "Покажи транзакции клиента с ИИН 200740010165 на сумму больше 25000 KZT за 13 июня 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='200740010165' AND amount_kzt > 250000 AND operation_date='2025-06-13';"
+  },
+  {
+    "id": 3,
+    "text": "Транзакции суммой больше 250000 через halyk банк",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE amount_kzt > 2500000 AND source_bank='halyk';"
+  },
+  {
+    "id": 4,
+    "text": "Покажи транзакции суммой больше 100000 и принмающий банком является АО \"RED BANK\"",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE amount_kzt>100000 AND receiver_name='АО "RED BANK"'"
+  },
+  {
+    "id": 5,
+    "text": "Покажи входящие докумены продаж с Red.kz за 07/01/2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE amount_kzt>100000 AND purpose_text LIKE 'Продажи с Red.kz за 07/01/2025' AND operation_type_raw LIKE 'вх.док.%;"
+  },
+  {
+    "id": 6,
+    "text": "Покажи исходящие докумены продаж с Red.kz за 13/01/2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE amount_kzt>100000 AND purpose_text LIKE 'Продажи с Red.kz за 13/01/2025' AND operation_type_raw LIKE 'исх.док.%;"
+  },
+  {
+    "id": 7,
+    "text": "Покажи мне транзакции суммой меньше 250000 через kaspi банк",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE amount_kzt > 2500000 AND source_bank='halyk';"
+  },
+  {
+    "id": 8,
+    "text": "Переводы суммой больше 200000 через kaspi банк с нового года 2025 до 1 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE source_bank='kaspi' AND amount_kzt>200000 AND operation_date BETWEEN '2025-01-01' AND '2025-02-01';"
+  },
+  {
+    "id": 9,
+    "text": "Транзакции где контрагент содержит \"DENTA_MED\" и сумма меньше 50к",
+    "gold_sql": "SELECT * FROM afm.transactions_core WHERE (payer_name LIKE '%DENTA_MED%' OR receiver_name LIKE '%DENTA MED%') AND amount_kzt < 50000;"
+  },
+  {
+    "id": 10,
+    "text": "Переводы суммой больше 150000 через kaspi банк после 1 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE source_bank='kaspi' AND amount_kzt>150000 AND operation_date>'2025-02-01';"
+  },
+  {
+    "id": 11,
+    "text": "Транзакции где контрагент содержит \"SMILEFACE\" и сумма меньше 60к за 2024-10-22",
+    "gold_sql": "SELECT * FROM afm.transactions_core WHERE (payer_name LIKE '%SMILEFACE%' OR receiver_name LIKE '%SMILEFACE%') AND amount_kzt < 60000 AND operation_date='2024-10-22';"
+  },
+  {
+    "id": 12,
+    "text": "Покажи имена контрагентов имеющих транзакции суммой больше 1000000",
+    "gold_sql": "SELECT receiver_name, payer_name FROM afm.transactions_core WHERE amount_kzt>1000000;"
+  },
+  {
+    "id": 13,
+    "text": "Покажи имена получателей имеющих транзакции суммой больше 1000000",
+    "gold_sql": "SELECT receiver_name FROM afm.transactions_core WHERE amount_kzt>1000000;"
+  },
+  {
+    "id": 14,
+    "text": "Покажи имена получателей имеющих транзакции суммой меньше 50000",
+    "gold_sql": "SELECT receiver_name FROM afm.transactions_core WHERE amount_kzt>50000;"
+  },
+  {
+    "id": 15,
+    "text": "Сколько всего денег было переведено через Halyk Bank за 26 августа 2015?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='halyk' AND operation_date='2015-08-26';"
+  },
+  {
+    "id": 16,
+    "text": "Сколько всего денег было переведено через Halyk Bank с 26 августа 2015 по 1 июня 2018?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='halyk' AND operation_date BETWEEN '2015-08-26' AND '2018-06-01';"
+  },
+  {
+    "id": 17,
+    "text": "Сколько всего денег было переведено через kaspi за 11 января 2018?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date='2018-01-11;"
+  },
+  {
+    "id": 18,
+    "text": "Сколько всего денег было переведено через Halyk после 3 августа 2017?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='halyk' AND operation_date>'2017-08-03';"
+  },
+  {
+    "id": 19,
+    "text": "Сколько всего денег было переведено через kaspi после 29 января 2020?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date>'2020-01-29;"
+  },
+  {
+    "id": 20,
+    "text": "Сколько всего денег было переведено через kaspi до 4 марта 2023?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date<'2023-03-04;"
+  },
+  {
+    "id": 21,
+    "text": "Сколько денег было переведено через halyk 21 января 2020?",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='halyk' AND operation_date<'2020-01-21;"
+  },
+  {
+    "id": 22,
+    "text": "Сколько всего денег было переведено через kaspi на новый год 2020",
+    "gold_sql": "SELECT SUM(amount_kzt) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date<'2020-01-01;"
+  },
+  {
+    "id": 23,
+    "text": "Сколько всего транзакций было осуществлено через kaspi в 2024 году",
+    "gold_sql": "SELECT COUNT(*) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 24,
+    "text": "Сколько всего транзакций было осуществлено через kaspi c 2024 и 2025 года",
+    "gold_sql": "SELECT COUNT(*) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date BETWEEN '2024-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 25,
+    "text": "Количество транзакций kaspi в 2025 году",
+    "gold_sql": "SELECT COUNT(*) FROM afm.transactions_core WHERE source_bank='kaspi' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 26,
+    "text": "Количество транзакций halyk в 2019 году",
+    "gold_sql": "SELECT COUNT(*) FROM afm.transactions_core WHERE source_bank='halyk' AND operation_date BETWEEN '2019-01-01' AND '2019-12-31';"
+  },
+  {
+    "id": 27,
+    "text": "Выведи транзакции с аномально высокой суммами за 2026 год",
+    "gold_sql": "SELECT * FROM afm.transactions_core WHERE amount_kzt > (SELECT AVG(amount_kzt) + 3 * STDDEV(amount_kzt) FROM afm.transactions_core) AND operation_date BETWEEN '2026-01-01' AND '2026-12-31';"
+  },
+  {
+    "id": 28,
+    "text": "Покажи топ-3 получателя по общей сумме переводов за 2023",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 29,
+    "text": "Покажи топ-5 получателя по общей сумме переводов за 2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 30,
+    "text": "Покажи топ-20 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 31,
+    "text": "Покажи топ-3 получателя с начала по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 32,
+    "text": "Покажи топ-20 получателя с начала по сумме переводов за 11.2026",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2026-11-01' AND operation_date < ('2026-11-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 33,
+    "text": "Покажи топ-15 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 34,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 35,
+    "text": "Покажи топ-15 получателя с начала через Halyk по сумме переводов за 12.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2024-12-01' AND operation_date < ('2024-12-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 36,
+    "text": "Покажи топ-15 получателя с начала по сумме переводов за 10.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2025-10-01' AND operation_date < ('2025-10-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 37,
+    "text": "Покажи топ-20 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 38,
+    "text": "Покажи топ-3 получателя с начала через Kaspi по сумме переводов за 2025 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 39,
+    "text": "Покажи топ-3 получателя с начала через Kaspi по сумме переводов за 03.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-03-01' AND operation_date < ('2025-03-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 40,
+    "text": "Покажи топ-15 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 41,
+    "text": "Покажи топ-5 получателя с конца по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 42,
+    "text": "Покажи топ-15 получателя с конца по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 43,
+    "text": "Покажи топ-20 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 44,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 45,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 03.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2024-03-01' AND operation_date < ('2024-03-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 46,
+    "text": "Покажи топ-5 получателя с начала по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 47,
+    "text": "Покажи топ-5 получателя с начала по сумме переводов за 03.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2024-03-01' AND operation_date < ('2024-03-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 48,
+    "text": "Покажи топ-15 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 49,
+    "text": "Покажи топ-10 получателя с начала через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 50,
+    "text": "Покажи топ-3 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 51,
+    "text": "Покажи топ-5 получателя с начала через Kaspi по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 52,
+    "text": "Покажи топ-5 получателя с начала через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 53,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 54,
+    "text": "Покажи топ-3 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 55,
+    "text": "Покажи топ-5 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 56,
+    "text": "Покажи топ-5 получателя с конца через Halyk по сумме переводов за 01.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-01-01' AND operation_date < ('2025-01-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 57,
+    "text": "Покажи топ-3 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 58,
+    "text": "Покажи топ-3 получателя с конца через Halyk по сумме переводов за 07.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2024-07-01' AND operation_date < ('2024-07-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 59,
+    "text": "Покажи топ-5 получателя с конца по сумме переводов за 02.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2024-02-01' AND operation_date < ('2024-02-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 60,
+    "text": "Покажи топ-20 получателя с конца по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 61,
+    "text": "Покажи топ-5 получателя с начала по сумме переводов за 01.2026",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2026-01-01' AND operation_date < ('2026-01-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 62,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 63,
+    "text": "Покажи топ-3 получателя с конца через Kaspi по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 64,
+    "text": "Покажи топ-20 получателя с конца через Kaspi по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 65,
+    "text": "Покажи топ-3 получателя с начала по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 66,
+    "text": "Покажи топ-15 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 67,
+    "text": "Покажи топ-20 получателя с конца через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 68,
+    "text": "Покажи топ-20 получателя с начала через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 69,
+    "text": "Покажи топ-5 получателя с конца через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 70,
+    "text": "Покажи топ-3 получателя с конца через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 71,
+    "text": "Покажи топ-3 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 72,
+    "text": "Покажи топ-20 получателя с конца через Halyk по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 73,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 74,
+    "text": "Покажи топ-3 получателя с начала через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 75,
+    "text": "Покажи топ-20 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 76,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 77,
+    "text": "Покажи топ-5 получателя с конца через Kaspi по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 78,
+    "text": "Покажи топ-15 получателя с конца через Kaspi по сумме переводов за 12.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-12-01' AND operation_date < ('2025-12-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 79,
+    "text": "Покажи топ-5 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 80,
+    "text": "Покажи топ-5 получателя с начала через Halyk по сумме переводов за 2025 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 81,
+    "text": "Покажи топ-5 получателя с начала через Halyk по сумме переводов за 09.2023",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-09-01' AND operation_date < ('2023-09-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 82,
+    "text": "Покажи топ-20 получателя с начала через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 83,
+    "text": "Покажи топ-15 получателя с начала по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 84,
+    "text": "Покажи топ-10 получателя с конца через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 85,
+    "text": "Покажи топ-10 получателя с конца через Halyk по сумме переводов за 11.2024",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2024-11-01' AND operation_date < ('2024-11-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 86,
+    "text": "Покажи топ-5 получателя с конца через Halyk по сумме переводов за 12.2023",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-12-01' AND operation_date < ('2023-12-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 87,
+    "text": "Покажи топ-15 получателя с начала через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 88,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 89,
+    "text": "Покажи топ-3 получателя с конца через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 90,
+    "text": "Покажи топ-5 получателя с начала через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 91,
+    "text": "Покажи топ-15 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 92,
+    "text": "Покажи топ-10 получателя с начала через Halyk по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 93,
+    "text": "Покажи топ-10 получателя с конца через Halyk по сумме переводов за 09.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-09-01' AND operation_date < ('2025-09-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 94,
+    "text": "Покажи топ-20 получателя с начала по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 95,
+    "text": "Покажи топ-15 получателя с начала через Kaspi по сумме переводов за 2023 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 96,
+    "text": "Покажи топ-10 получателя с конца через Kaspi по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 97,
+    "text": "Покажи топ-5 получателя с конца через Halyk по сумме переводов за 02.2026",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2026-02-01' AND operation_date < ('2026-02-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 98,
+    "text": "Покажи топ-20 получателя с начала через Kaspi по сумме переводов за 03.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-03-01' AND operation_date < ('2025-03-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 99,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 100,
+    "text": "Покажи топ-20 получателя с конца через Halyk по сумме переводов за 2025 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 101,
+    "text": "Покажи топ-15 получателя с начала по сумме переводов за 10.2023",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-10-01' AND operation_date < ('2023-10-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 102,
+    "text": "Покажи топ-20 получателя с начала через Halyk по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 103,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за прошлую неделю",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 104,
+    "text": "Покажи топ-5 получателя с конца по сумме переводов за 05.2026",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2026-05-01' AND operation_date < ('2026-05-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 105,
+    "text": "Покажи топ-3 получателя с конца по сумме переводов за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 106,
+    "text": "Покажи топ-10 получателя с конца по сумме переводов за 09.2023",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-09-01' AND operation_date < ('2023-09-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 107,
+    "text": "Покажи топ-15 получателя с конца через Halyk по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 108,
+    "text": "Покажи топ-3 получателя с конца через Halyk по сумме переводов за 07.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-07-01' AND operation_date < ('2025-07-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 109,
+    "text": "Покажи топ-15 получателя с конца через Kaspi по сумме переводов за 2026 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2026-01-01' AND '2026-12-31' GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 110,
+    "text": "Покажи топ-15 получателя с конца по сумме переводов за 11.2025",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2025-11-01' AND operation_date < ('2025-11-01'::date + interval '1 month') GROUP BY receiver_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 112,
+    "text": "Кто топ-5 отправителя с начала через Kaspi по общей сумме за 04.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2023-04-01' AND operation_date < ('2023-04-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 113,
+    "text": "Кто топ-20 отправителя с конца через Halyk по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 114,
+    "text": "Кто топ-5 отправителя с начала через Kaspi по общей сумме за 04.2024?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2024-04-01' AND operation_date < ('2024-04-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 115,
+    "text": "Кто топ-10 отправителя с конца по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 116,
+    "text": "Кто топ-5 отправителя с конца через Kaspi по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 117,
+    "text": "Кто топ-3 отправителя с начала по общей сумме за 09.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-09-01' AND operation_date < ('2023-09-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 118,
+    "text": "Кто топ-3 отправителя с конца через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 119,
+    "text": "Кто топ-15 отправителя с начала через Halyk по общей сумме за 04.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-04-01' AND operation_date < ('2023-04-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 120,
+    "text": "Кто топ-5 отправителя с начала по общей сумме за 07.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-07-01' AND operation_date < ('2023-07-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 121,
+    "text": "Кто топ-10 отправителя с конца через Halyk по общей сумме за 03.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-03-01' AND operation_date < ('2025-03-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 122,
+    "text": "Кто топ-10 отправителя с начала через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 123,
+    "text": "Кто топ-15 отправителя с конца по общей сумме за 02.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2025-02-01' AND operation_date < ('2025-02-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 124,
+    "text": "Кто топ-5 отправителя с начала через Kaspi по общей сумме за 10.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-10-01' AND operation_date < ('2025-10-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 125,
+    "text": "Кто топ-5 отправителя с начала по общей сумме за 03.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-03-01' AND operation_date < ('2023-03-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 126,
+    "text": "Кто топ-15 отправителя с конца через Halyk по общей сумме за 02.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-02-01' AND operation_date < ('2023-02-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 127,
+    "text": "Кто топ-3 отправителя с начала по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 128,
+    "text": "Кто топ-5 отправителя с конца по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 129,
+    "text": "Кто топ-10 отправителя с конца через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 130,
+    "text": "Кто топ-20 отправителя с начала через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 131,
+    "text": "Кто топ-5 отправителя с конца через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 132,
+    "text": "Кто топ-10 отправителя с конца через Halyk по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 133,
+    "text": "Кто топ-15 отправителя с начала через Halyk по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 134,
+    "text": "Кто топ-10 отправителя с начала через Halyk по общей сумме за 10.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-10-01' AND operation_date < ('2025-10-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 135,
+    "text": "Кто топ-20 отправителя с начала через Kaspi по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 136,
+    "text": "Кто топ-10 отправителя с конца по общей сумме за 11.2024?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2024-11-01' AND operation_date < ('2024-11-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 137,
+    "text": "Кто топ-15 отправителя с начала по общей сумме за 09.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-09-01' AND operation_date < ('2023-09-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 138,
+    "text": "Кто топ-20 отправителя с начала через Kaspi по общей сумме за 08.2024?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2024-08-01' AND operation_date < ('2024-08-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 139,
+    "text": "Кто топ-3 отправителя с начала через Kaspi по общей сумме за 01.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-01-01' AND operation_date < ('2025-01-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 140,
+    "text": "Кто топ-5 отправителя с начала по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 141,
+    "text": "Кто топ-15 отправителя с конца через Halyk по общей сумме за 07.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-07-01' AND operation_date < ('2025-07-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 142,
+    "text": "Кто топ-10 отправителя с начала через Halyk по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 143,
+    "text": "Кто топ-15 отправителя с начала по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 144,
+    "text": "Кто топ-20 отправителя с конца через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 145,
+    "text": "Кто топ-15 отправителя с конца по общей сумме за 06.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-06-01' AND operation_date < ('2023-06-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 146,
+    "text": "Кто топ-5 отправителя с начала через Halyk по общей сумме за 04.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-04-01' AND operation_date < ('2023-04-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 147,
+    "text": "Кто топ-15 отправителя с начала через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 148,
+    "text": "Кто топ-10 отправителя с начала через Kaspi по общей сумме за 07.2024?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2024-07-01' AND operation_date < ('2024-07-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 149,
+    "text": "Кто топ-10 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 150,
+    "text": "Кто топ-5 отправителя с конца по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 151,
+    "text": "Кто топ-20 отправителя с конца через Halyk по общей сумме за 02.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-02-01' AND operation_date < ('2023-02-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 152,
+    "text": "Кто топ-20 отправителя с начала через Halyk по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 153,
+    "text": "Кто топ-15 отправителя с начала по общей сумме за 07.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= '2023-07-01' AND operation_date < ('2023-07-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 154,
+    "text": "Кто топ-20 отправителя с конца через Kaspi по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 155,
+    "text": "Кто топ-15 отправителя с начала через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 156,
+    "text": "Кто топ-10 отправителя с конца через Halyk по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 10;"
+  },
+  {
+    "id": 157,
+    "text": "Кто топ-15 отправителя с начала через Halyk по общей сумме за 06.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-06-01' AND operation_date < ('2023-06-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 158,
+    "text": "Кто топ-20 отправителя с начала через Kaspi по общей сумме за 11.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-11-01' AND operation_date < ('2025-11-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 159,
+    "text": "Кто топ-15 отправителя с конца через Kaspi по общей сумме за 02.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-02-01' AND operation_date < ('2025-02-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 160,
+    "text": "Кто топ-3 отправителя с конца через Kaspi по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 161,
+    "text": "Кто топ-15 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 162,
+    "text": "Кто топ-15 отправителя с начала по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 163,
+    "text": "Кто топ-3 отправителя с начала по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 164,
+    "text": "Кто топ-3 отправителя с начала по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 165,
+    "text": "Кто топ-5 отправителя с конца через Halyk по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 166,
+    "text": "Кто топ-3 отправителя с начала через Kaspi по общей сумме за 2025 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2025-01-01' AND '2025-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 167,
+    "text": "Кто топ-5 отправителя с конца через Kaspi по общей сумме за 01.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= '2025-01-01' AND operation_date < ('2025-01-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 168,
+    "text": "Кто топ-10 отправителя с начала по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 10;"
+  },
+  {
+    "id": 169,
+    "text": "Кто топ-5 отправителя с конца через Kaspi по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 170,
+    "text": "Кто топ-5 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 5;"
+  },
+  {
+    "id": 171,
+    "text": "Кто топ-15 отправителя с начала через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 172,
+    "text": "Кто топ-20 отправителя с конца через Halyk по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 20;"
+  },
+  {
+    "id": 173,
+    "text": "Кто топ-5 отправителя с начала через Halyk по общей сумме за 12.2023?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2023-12-01' AND operation_date < ('2023-12-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 174,
+    "text": "Кто топ-15 отправителя с начала через Kaspi по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 15;"
+  },
+  {
+    "id": 175,
+    "text": "Кто топ-15 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 176,
+    "text": "Кто топ-5 отправителя с начала через Halyk по общей сумме за 10.2025?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Halyk' AND operation_date >= '2025-10-01' AND operation_date < ('2025-10-01'::date + interval '1 month') GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 5;"
+  },
+  {
+    "id": 177,
+    "text": "Кто топ-3 отправителя с начала по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 3;"
+  },
+  {
+    "id": 178,
+    "text": "Кто топ-20 отправителя с начала через Kaspi по общей сумме за 2024 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date BETWEEN '2024-01-01' AND '2024-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) DESC LIMIT 20;"
+  },
+  {
+    "id": 179,
+    "text": "Кто топ-15 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 180,
+    "text": "Кто топ-3 отправителя с конца по общей сумме за 2023 год?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 3;"
+  },
+  {
+    "id": 181,
+    "text": "Кто топ-15 отправителя с конца через Kaspi по общей сумме за последнюю неделю?",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) FROM afm.transactions_view WHERE source_bank = 'Kaspi' AND operation_date >= CURRENT_DATE - INTERVAL '7 days' GROUP BY payer_name ORDER BY SUM(amount_kzt) ASC LIMIT 15;"
+  },
+  {
+    "id": 182,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 10000000 в период с 01.01.2025 по 31.03.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date BETWEEN '2025-01-01' AND '2025-03-31';"
+  },
+  {
+    "id": 183,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 184,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 185,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 10000000 в период с 01.01.2023 по 31.03.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date BETWEEN '2023-01-01' AND '2023-03-31';"
+  },
+  {
+    "id": 186,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 10000000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 187,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 188,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за 2025 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 189,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 2500000 за 2023 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 2500000 AND operation_date BETWEEN '2023-01-01' AND '2023-12-31';"
+  },
+  {
+    "id": 190,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 10000000 за 01.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date >= '2025-01-01' AND operation_date < ('2025-01-01'::date + interval '1 month');"
+  },
+  {
+    "id": 191,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 10000000 в период с 01.01.2023 по 31.03.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date BETWEEN '2023-01-01' AND '2023-03-31';"
+  },
+  {
+    "id": 192,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 500000 за 11.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 500000 AND operation_date >= '2024-11-01' AND operation_date < ('2024-11-01'::date + interval '1 month');"
+  },
+  {
+    "id": 193,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за 05.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date >= '2023-05-01' AND operation_date < ('2023-05-01'::date + interval '1 month');"
+  },
+  {
+    "id": 194,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 100000 в период с 01.01.2024 по 31.03.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 100000 AND operation_date BETWEEN '2024-01-01' AND '2024-03-31';"
+  },
+  {
+    "id": 195,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 100000 за 08.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 100000 AND operation_date >= '2025-08-01' AND operation_date < ('2025-08-01'::date + interval '1 month');"
+  },
+  {
+    "id": 196,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 500000 в период с 01.01.2024 по 31.03.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 500000 AND operation_date BETWEEN '2024-01-01' AND '2024-03-31';"
+  },
+  {
+    "id": 197,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 100000 за 2025 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 100000 AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 198,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 100000 за 08.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 100000 AND operation_date >= '2023-08-01' AND operation_date < ('2023-08-01'::date + interval '1 month');"
+  },
+  {
+    "id": 199,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 100000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 100000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 200,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 500000 в период с 01.01.2023 по 31.03.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 500000 AND operation_date BETWEEN '2023-01-01' AND '2023-03-31';"
+  },
+  {
+    "id": 201,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 100000 за 11.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 100000 AND operation_date >= '2023-11-01' AND operation_date < ('2023-11-01'::date + interval '1 month');"
+  },
+  {
+    "id": 202,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 10000000 за 09.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date >= '2024-09-01' AND operation_date < ('2024-09-01'::date + interval '1 month');"
+  },
+  {
+    "id": 203,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 10000000 за 01.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 10000000 AND operation_date >= '2025-01-01' AND operation_date < ('2025-01-01'::date + interval '1 month');"
+  },
+  {
+    "id": 204,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 1000000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 1000000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 205,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 10000000 в период с 01.01.2023 по 31.03.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 10000000 AND operation_date BETWEEN '2023-01-01' AND '2023-03-31';"
+  },
+  {
+    "id": 206,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 2500000 в период с 01.01.2025 по 31.03.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 2500000 AND operation_date BETWEEN '2025-01-01' AND '2025-03-31';"
+  },
+  {
+    "id": 207,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 10000000 за 2025 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 10000000 AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 208,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 10000000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 10000000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 209,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 1000000 в период с 01.01.2025 по 31.03.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 1000000 AND operation_date BETWEEN '2025-01-01' AND '2025-03-31';"
+  },
+  {
+    "id": 210,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 10000000 за 2025 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 10000000 AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 211,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 10000000 за 12.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 10000000 AND operation_date >= '2025-12-01' AND operation_date < ('2025-12-01'::date + interval '1 month');"
+  },
+  {
+    "id": 212,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 2500000 за 12.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 2500000 AND operation_date >= '2025-12-01' AND operation_date < ('2025-12-01'::date + interval '1 month');"
+  },
+  {
+    "id": 213,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 214,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 215,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 216,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 217,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 100000 в период с 01.01.2025 по 31.03.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 100000 AND operation_date BETWEEN '2025-01-01' AND '2025-03-31';"
+  },
+  {
+    "id": 218,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за 04.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date >= '2025-04-01' AND operation_date < ('2025-04-01'::date + interval '1 month');"
+  },
+  {
+    "id": 219,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 1000000 за 11.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 1000000 AND operation_date >= '2024-11-01' AND operation_date < ('2024-11-01'::date + interval '1 month');"
+  },
+  {
+    "id": 220,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 10000000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 10000000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 221,
+    "text": "Покажи всех контрагентов, у которых были транзакции меньше 1000000 за 2023 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt < 1000000 AND operation_date BETWEEN '2023-01-01' AND '2023-12-31';"
+  },
+  {
+    "id": 222,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за 11.2025",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date >= '2025-11-01' AND operation_date < ('2025-11-01'::date + interval '1 month');"
+  },
+  {
+    "id": 223,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 2500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 2500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 224,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 2500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 2500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 225,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 2500000 за последние 30 дней",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 2500000 AND operation_date >= CURRENT_DATE - INTERVAL '30 days';"
+  },
+  {
+    "id": 226,
+    "text": "Покажи всех контрагентов, у которых были транзакции свыше 500000 за 2023 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 500000 AND operation_date BETWEEN '2023-01-01' AND '2023-12-31';"
+  },
+  {
+    "id": 227,
+    "text": "Покажи всех контрагентов, у которых были транзакции больше 2500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt > 2500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 228,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 500000 за 2024 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 500000 AND operation_date BETWEEN '2024-01-01' AND '2024-12-31';"
+  },
+  {
+    "id": 229,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 100000 за 03.2023",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 100000 AND operation_date >= '2023-03-01' AND operation_date < ('2023-03-01'::date + interval '1 month');"
+  },
+  {
+    "id": 230,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 10000000 за 01.2024",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 10000000 AND operation_date >= '2024-01-01' AND operation_date < ('2024-01-01'::date + interval '1 month');"
+  },
+  {
+    "id": 231,
+    "text": "Покажи всех контрагентов, у которых были транзакции не более 500000 за 2025 год",
+    "gold_sql": "SELECT DISTINCT payer_name, receiver_name FROM afm.transactions_core WHERE amount_kzt <= 500000 AND operation_date BETWEEN '2025-01-01' AND '2025-12-31';"
+  },
+  {
+    "id": 231,
+    "text": "Покажи транзакции клиента с ИИН 017564827208 на сумму больше 1002092 KZT от 17 июля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='017564827208' AND amount_kzt > 1002092 AND operation_date='2024-07-17';"
+  },
+  {
+    "id": 232,
+    "text": "Покажи транзакции клиента с ИИН 617682772366 на сумму меньше 430020 KZT от 28 августа 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='617682772366' AND amount_kzt < 430020 AND operation_date='2025-08-28';"
+  },
+  {
+    "id": 233,
+    "text": "Покажи транзакции клиента с ИИН 230491512567 на сумму меньше 633179 KZT от 18 апреля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='230491512567' AND amount_kzt < 633179 AND operation_date='2023-04-18';"
+  },
+  {
+    "id": 234,
+    "text": "Покажи транзакции клиента с ИИН 985950164774 на сумму больше 926075 KZT от 28 августа 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='985950164774' AND amount_kzt > 926075 AND operation_date='2023-08-28';"
+  },
+  {
+    "id": 235,
+    "text": "Покажи транзакции клиента с ИИН 824339884963 на сумму меньше 287059 KZT от 17 апреля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='824339884963' AND amount_kzt < 287059 AND operation_date='2025-04-17';"
+  },
+  {
+    "id": 236,
+    "text": "Покажи транзакции клиента с ИИН 937289704514 на сумму больше 1260115 KZT от 15 марта 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='937289704514' AND amount_kzt > 1260115 AND operation_date='2025-03-15';"
+  },
+  {
+    "id": 237,
+    "text": "Покажи транзакции клиента с ИИН 905486149618 на сумму больше 979590 KZT от 27 января 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='905486149618' AND amount_kzt > 979590 AND operation_date='2025-01-27';"
+  },
+  {
+    "id": 238,
+    "text": "Покажи транзакции клиента с ИИН 934555998258 на сумму больше 98087 KZT от 12 декабря 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='934555998258' AND amount_kzt > 98087 AND operation_date='2023-12-12';"
+  },
+  {
+    "id": 239,
+    "text": "Покажи транзакции клиента с ИИН 936368339624 на сумму меньше 524363 KZT от 22 апреля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='936368339624' AND amount_kzt < 524363 AND operation_date='2024-04-22';"
+  },
+  {
+    "id": 240,
+    "text": "Покажи транзакции клиента с ИИН 999873200412 на сумму меньше 893818 KZT от 02 марта 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='999873200412' AND amount_kzt < 893818 AND operation_date='2025-03-02';"
+  },
+  {
+    "id": 241,
+    "text": "Покажи транзакции клиента с ИИН 942057563847 на сумму больше 521574 KZT от 26 февраля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='942057563847' AND amount_kzt > 521574 AND operation_date='2024-02-26';"
+  },
+  {
+    "id": 242,
+    "text": "Покажи транзакции клиента с ИИН 041567167613 на сумму больше 1029083 KZT от 09 марта 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='041567167613' AND amount_kzt > 1029083 AND operation_date='2025-03-09';"
+  },
+  {
+    "id": 243,
+    "text": "Покажи транзакции клиента с ИИН 909153661225 на сумму больше 1159990 KZT от 04 сентября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='909153661225' AND amount_kzt > 1159990 AND operation_date='2025-09-04';"
+  },
+  {
+    "id": 244,
+    "text": "Покажи транзакции клиента с ИИН 066375483086 на сумму меньше 1290500 KZT от 03 октября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='066375483086' AND amount_kzt < 1290500 AND operation_date='2023-10-03';"
+  },
+  {
+    "id": 245,
+    "text": "Покажи транзакции клиента с ИИН 031567064216 на сумму больше 798728 KZT от 10 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='031567064216' AND amount_kzt > 798728 AND operation_date='2025-11-10';"
+  },
+  {
+    "id": 246,
+    "text": "Покажи транзакции клиента с ИИН 762498863594 на сумму больше 621563 KZT от 10 апреля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='762498863594' AND amount_kzt > 621563 AND operation_date='2025-04-10';"
+  },
+  {
+    "id": 247,
+    "text": "Покажи транзакции клиента с ИИН 916164866520 на сумму больше 1020832 KZT от 13 августа 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='916164866520' AND amount_kzt > 1020832 AND operation_date='2024-08-13';"
+  },
+  {
+    "id": 248,
+    "text": "Покажи транзакции клиента с ИИН 008124928381 на сумму больше 681893 KZT от 04 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='008124928381' AND amount_kzt > 681893 AND operation_date='2025-11-04';"
+  },
+  {
+    "id": 249,
+    "text": "Покажи транзакции клиента с ИИН 112967394450 на сумму меньше 688607 KZT от 11 апреля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='112967394450' AND amount_kzt < 688607 AND operation_date='2025-04-11';"
+  },
+  {
+    "id": 250,
+    "text": "Покажи транзакции клиента с ИИН 022367929200 на сумму меньше 149450 KZT от 09 августа 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='022367929200' AND amount_kzt < 149450 AND operation_date='2024-08-09';"
+  },
+  {
+    "id": 251,
+    "text": "Покажи транзакции клиента с ИИН 954884945470 на сумму больше 309843 KZT от 03 июля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='954884945470' AND amount_kzt > 309843 AND operation_date='2025-07-03';"
+  },
+  {
+    "id": 252,
+    "text": "Покажи транзакции клиента с ИИН 938999421836 на сумму меньше 321397 KZT от 09 декабря 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='938999421836' AND amount_kzt < 321397 AND operation_date='2023-12-09';"
+  },
+  {
+    "id": 253,
+    "text": "Покажи транзакции клиента с ИИН 905538972358 на сумму меньше 453390 KZT от 17 апреля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='905538972358' AND amount_kzt < 453390 AND operation_date='2024-04-17';"
+  },
+  {
+    "id": 254,
+    "text": "Покажи транзакции клиента с ИИН 020099708740 на сумму больше 603288 KZT от 16 марта 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='020099708740' AND amount_kzt > 603288 AND operation_date='2025-03-16';"
+  },
+  {
+    "id": 255,
+    "text": "Покажи транзакции клиента с ИИН 950687835137 на сумму больше 1283099 KZT от 26 декабря 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='950687835137' AND amount_kzt > 1283099 AND operation_date='2023-12-26';"
+  },
+  {
+    "id": 256,
+    "text": "Покажи транзакции клиента с ИИН 913690438959 на сумму больше 908863 KZT от 22 мая 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='913690438959' AND amount_kzt > 908863 AND operation_date='2025-05-22';"
+  },
+  {
+    "id": 257,
+    "text": "Покажи транзакции клиента с ИИН 075658640460 на сумму меньше 418780 KZT от 16 октября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='075658640460' AND amount_kzt < 418780 AND operation_date='2023-10-16';"
+  },
+  {
+    "id": 258,
+    "text": "Покажи транзакции клиента с ИИН 979103978859 на сумму меньше 1161870 KZT от 21 ноября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='979103978859' AND amount_kzt < 1161870 AND operation_date='2024-11-21';"
+  },
+  {
+    "id": 259,
+    "text": "Покажи транзакции клиента с ИИН 042443785310 на сумму меньше 720909 KZT от 05 мая 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='042443785310' AND amount_kzt < 720909 AND operation_date='2023-05-05';"
+  },
+  {
+    "id": 260,
+    "text": "Покажи транзакции клиента с ИИН 137924263278 на сумму меньше 667020 KZT от 26 апреля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='137924263278' AND amount_kzt < 667020 AND operation_date='2025-04-26';"
+  },
+  {
+    "id": 261,
+    "text": "Покажи транзакции клиента с ИИН 004971892234 на сумму меньше 470040 KZT от 08 сентября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='004971892234' AND amount_kzt < 470040 AND operation_date='2024-09-08';"
+  },
+  {
+    "id": 262,
+    "text": "Покажи транзакции клиента с ИИН 059006416577 на сумму меньше 1344713 KZT от 11 ноября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='059006416577' AND amount_kzt < 1344713 AND operation_date='2023-11-11';"
+  },
+  {
+    "id": 263,
+    "text": "Покажи транзакции клиента с ИИН 009705344001 на сумму больше 982045 KZT от 01 октября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='009705344001' AND amount_kzt > 982045 AND operation_date='2023-10-01';"
+  },
+  {
+    "id": 264,
+    "text": "Покажи транзакции клиента с ИИН 438136998027 на сумму больше 1316271 KZT от 03 июня 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='438136998027' AND amount_kzt > 1316271 AND operation_date='2024-06-03';"
+  },
+  {
+    "id": 265,
+    "text": "Покажи транзакции клиента с ИИН 952586048524 на сумму меньше 720331 KZT от 19 декабря 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='952586048524' AND amount_kzt < 720331 AND operation_date='2024-12-19';"
+  },
+  {
+    "id": 266,
+    "text": "Покажи транзакции клиента с ИИН 664866580267 на сумму больше 212249 KZT от 01 января 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='664866580267' AND amount_kzt > 212249 AND operation_date='2023-01-01';"
+  },
+  {
+    "id": 267,
+    "text": "Покажи транзакции клиента с ИИН 910884171710 на сумму меньше 480232 KZT от 15 апреля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='910884171710' AND amount_kzt < 480232 AND operation_date='2023-04-15';"
+  },
+  {
+    "id": 268,
+    "text": "Покажи транзакции клиента с ИИН 867550987148 на сумму больше 256586 KZT от 27 апреля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='867550987148' AND amount_kzt > 256586 AND operation_date='2024-04-27';"
+  },
+  {
+    "id": 269,
+    "text": "Покажи транзакции клиента с ИИН 112318574478 на сумму больше 1165720 KZT от 22 октября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='112318574478' AND amount_kzt > 1165720 AND operation_date='2025-10-22';"
+  },
+  {
+    "id": 270,
+    "text": "Покажи транзакции клиента с ИИН 952277834033 на сумму меньше 1378381 KZT от 23 января 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='952277834033' AND amount_kzt < 1378381 AND operation_date='2023-01-23';"
+  },
+  {
+    "id": 271,
+    "text": "Покажи транзакции клиента с ИИН 026828424613 на сумму меньше 708391 KZT от 16 июля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='026828424613' AND amount_kzt < 708391 AND operation_date='2023-07-16';"
+  },
+  {
+    "id": 272,
+    "text": "Покажи транзакции клиента с ИИН 931417789656 на сумму больше 973638 KZT от 15 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='931417789656' AND amount_kzt > 973638 AND operation_date='2025-02-15';"
+  },
+  {
+    "id": 273,
+    "text": "Покажи транзакции клиента с ИИН 094238708066 на сумму больше 131846 KZT от 27 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='094238708066' AND amount_kzt > 131846 AND operation_date='2023-03-27';"
+  },
+  {
+    "id": 274,
+    "text": "Покажи транзакции клиента с ИИН 647518923479 на сумму меньше 1122444 KZT от 10 июля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='647518923479' AND amount_kzt < 1122444 AND operation_date='2024-07-10';"
+  },
+  {
+    "id": 275,
+    "text": "Покажи транзакции клиента с ИИН 019339004281 на сумму больше 879798 KZT от 18 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='019339004281' AND amount_kzt > 879798 AND operation_date='2023-03-18';"
+  },
+  {
+    "id": 276,
+    "text": "Покажи транзакции клиента с ИИН 946744174595 на сумму меньше 1001912 KZT от 17 октября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='946744174595' AND amount_kzt < 1001912 AND operation_date='2023-10-17';"
+  },
+  {
+    "id": 277,
+    "text": "Покажи транзакции клиента с ИИН 911931537700 на сумму больше 441471 KZT от 07 ноября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='911931537700' AND amount_kzt > 441471 AND operation_date='2024-11-07';"
+  },
+  {
+    "id": 278,
+    "text": "Покажи транзакции клиента с ИИН 915047227249 на сумму больше 829272 KZT от 23 сентября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='915047227249' AND amount_kzt > 829272 AND operation_date='2024-09-23';"
+  },
+  {
+    "id": 279,
+    "text": "Покажи транзакции клиента с ИИН 004808843087 на сумму больше 1104377 KZT от 03 июня 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='004808843087' AND amount_kzt > 1104377 AND operation_date='2023-06-03';"
+  },
+  {
+    "id": 280,
+    "text": "Покажи транзакции клиента с ИИН 020228922658 на сумму больше 754843 KZT от 06 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='020228922658' AND amount_kzt > 754843 AND operation_date='2025-02-06';"
+  },
+  {
+    "id": 281,
+    "text": "Покажи транзакции клиента с БИН 044353664133 на сумму меньше 1015945 KZT от 05 января 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='044353664133' AND amount_kzt < 1015945 AND operation_date='2025-01-05';"
+  },
+  {
+    "id": 282,
+    "text": "Покажи транзакции клиента с БИН 983958225158 на сумму больше 887312 KZT от 06 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='983958225158' AND amount_kzt > 887312 AND operation_date='2025-11-06';"
+  },
+  {
+    "id": 283,
+    "text": "Покажи транзакции клиента с БИН 982072471459 на сумму меньше 560569 KZT от 02 мая 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='982072471459' AND amount_kzt < 560569 AND operation_date='2025-05-02';"
+  },
+  {
+    "id": 284,
+    "text": "Покажи транзакции клиента с БИН 332198678938 на сумму больше 856534 KZT от 24 сентября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='332198678938' AND amount_kzt > 856534 AND operation_date='2024-09-24';"
+  },
+  {
+    "id": 285,
+    "text": "Покажи транзакции клиента с БИН 644309338060 на сумму больше 377338 KZT от 20 февраля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='644309338060' AND amount_kzt > 377338 AND operation_date='2024-02-20';"
+  },
+  {
+    "id": 286,
+    "text": "Покажи транзакции клиента с БИН 017739866407 на сумму больше 807006 KZT от 09 сентября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='017739866407' AND amount_kzt > 807006 AND operation_date='2025-09-09';"
+  },
+  {
+    "id": 287,
+    "text": "Покажи транзакции клиента с БИН 902632546627 на сумму меньше 921849 KZT от 05 июля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='902632546627' AND amount_kzt < 921849 AND operation_date='2023-07-05';"
+  },
+  {
+    "id": 288,
+    "text": "Покажи транзакции клиента с БИН 049963052192 на сумму больше 1327486 KZT от 10 ноября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='049963052192' AND amount_kzt > 1327486 AND operation_date='2023-11-10';"
+  },
+  {
+    "id": 289,
+    "text": "Покажи транзакции клиента с БИН 930255548243 на сумму меньше 60123 KZT от 10 мая 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='930255548243' AND amount_kzt < 60123 AND operation_date='2023-05-10';"
+  },
+  {
+    "id": 290,
+    "text": "Покажи транзакции клиента с БИН 044301414802 на сумму меньше 1242904 KZT от 26 июля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='044301414802' AND amount_kzt < 1242904 AND operation_date='2025-07-26';"
+  },
+  {
+    "id": 291,
+    "text": "Покажи транзакции клиента с БИН 911529034815 на сумму меньше 781421 KZT от 03 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='911529034815' AND amount_kzt < 781421 AND operation_date='2023-03-03';"
+  },
+  {
+    "id": 292,
+    "text": "Покажи транзакции клиента с БИН 222467812608 на сумму меньше 607414 KZT от 09 марта 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='222467812608' AND amount_kzt < 607414 AND operation_date='2025-03-09';"
+  },
+  {
+    "id": 293,
+    "text": "Покажи транзакции клиента с БИН 908402037625 на сумму меньше 1084811 KZT от 01 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='908402037625' AND amount_kzt < 1084811 AND operation_date='2023-03-01';"
+  },
+  {
+    "id": 294,
+    "text": "Покажи транзакции клиента с БИН 892474502002 на сумму больше 465950 KZT от 13 ноября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='892474502002' AND amount_kzt > 465950 AND operation_date='2023-11-13';"
+  },
+  {
+    "id": 295,
+    "text": "Покажи транзакции клиента с БИН 947837739360 на сумму больше 1291222 KZT от 27 июля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='947837739360' AND amount_kzt > 1291222 AND operation_date='2025-07-27';"
+  },
+  {
+    "id": 296,
+    "text": "Покажи транзакции клиента с БИН 952683360664 на сумму больше 641931 KZT от 06 июля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='952683360664' AND amount_kzt > 641931 AND operation_date='2024-07-06';"
+  },
+  {
+    "id": 297,
+    "text": "Покажи транзакции клиента с БИН 019539141708 на сумму больше 1314083 KZT от 28 мая 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='019539141708' AND amount_kzt > 1314083 AND operation_date='2024-05-28';"
+  },
+  {
+    "id": 298,
+    "text": "Покажи транзакции клиента с БИН 922442129323 на сумму меньше 698449 KZT от 26 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='922442129323' AND amount_kzt < 698449 AND operation_date='2025-11-26';"
+  },
+  {
+    "id": 299,
+    "text": "Покажи транзакции клиента с БИН 961159015415 на сумму больше 1453578 KZT от 07 февраля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='961159015415' AND amount_kzt > 1453578 AND operation_date='2023-02-07';"
+  },
+  {
+    "id": 300,
+    "text": "Покажи транзакции клиента с БИН 203559254162 на сумму меньше 450382 KZT от 23 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='203559254162' AND amount_kzt < 450382 AND operation_date='2025-11-23';"
+  },
+  {
+    "id": 301,
+    "text": "Покажи транзакции клиента с БИН 045197860876 на сумму меньше 150017 KZT от 28 сентября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='045197860876' AND amount_kzt < 150017 AND operation_date='2024-09-28';"
+  },
+  {
+    "id": 302,
+    "text": "Покажи транзакции клиента с БИН 034695613094 на сумму меньше 659886 KZT от 10 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='034695613094' AND amount_kzt < 659886 AND operation_date='2025-11-10';"
+  },
+  {
+    "id": 303,
+    "text": "Покажи транзакции клиента с БИН 830182486247 на сумму меньше 1202998 KZT от 01 ноября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='830182486247' AND amount_kzt < 1202998 AND operation_date='2024-11-01';"
+  },
+  {
+    "id": 304,
+    "text": "Покажи транзакции клиента с БИН 298742851347 на сумму больше 1229443 KZT от 25 июля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='298742851347' AND amount_kzt > 1229443 AND operation_date='2025-07-25';"
+  },
+  {
+    "id": 305,
+    "text": "Покажи транзакции клиента с БИН 253085506962 на сумму меньше 1136366 KZT от 26 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='253085506962' AND amount_kzt < 1136366 AND operation_date='2025-02-26';"
+  },
+  {
+    "id": 306,
+    "text": "Покажи транзакции клиента с БИН 978961119684 на сумму меньше 958444 KZT от 13 января 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='978961119684' AND amount_kzt < 958444 AND operation_date='2025-01-13';"
+  },
+  {
+    "id": 307,
+    "text": "Покажи транзакции клиента с БИН 980326828709 на сумму больше 853665 KZT от 06 февраля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='980326828709' AND amount_kzt > 853665 AND operation_date='2024-02-06';"
+  },
+  {
+    "id": 308,
+    "text": "Покажи транзакции клиента с БИН 036712214866 на сумму больше 966525 KZT от 06 октября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='036712214866' AND amount_kzt > 966525 AND operation_date='2025-10-06';"
+  },
+  {
+    "id": 309,
+    "text": "Покажи транзакции клиента с БИН 044111701741 на сумму больше 567803 KZT от 09 ноября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='044111701741' AND amount_kzt > 567803 AND operation_date='2025-11-09';"
+  },
+  {
+    "id": 310,
+    "text": "Покажи транзакции клиента с БИН 291609372950 на сумму больше 618105 KZT от 17 марта 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='291609372950' AND amount_kzt > 618105 AND operation_date='2024-03-17';"
+  },
+  {
+    "id": 311,
+    "text": "Покажи транзакции клиента с БИН 011037281580 на сумму больше 1232465 KZT от 18 мая 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='011037281580' AND amount_kzt > 1232465 AND operation_date='2025-05-18';"
+  },
+  {
+    "id": 312,
+    "text": "Покажи транзакции клиента с БИН 044104960200 на сумму больше 630086 KZT от 17 августа 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='044104960200' AND amount_kzt > 630086 AND operation_date='2023-08-17';"
+  },
+  {
+    "id": 313,
+    "text": "Покажи транзакции клиента с БИН 924685783393 на сумму меньше 1417213 KZT от 07 декабря 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='924685783393' AND amount_kzt < 1417213 AND operation_date='2023-12-07';"
+  },
+  {
+    "id": 314,
+    "text": "Покажи транзакции клиента с БИН 968014662940 на сумму меньше 1341013 KZT от 28 октября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='968014662940' AND amount_kzt < 1341013 AND operation_date='2024-10-28';"
+  },
+  {
+    "id": 315,
+    "text": "Покажи транзакции клиента с БИН 914119255084 на сумму меньше 995187 KZT от 26 сентября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='914119255084' AND amount_kzt < 995187 AND operation_date='2025-09-26';"
+  },
+  {
+    "id": 316,
+    "text": "Покажи транзакции клиента с БИН 046008147959 на сумму больше 1154989 KZT от 10 июля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='046008147959' AND amount_kzt > 1154989 AND operation_date='2023-07-10';"
+  },
+  {
+    "id": 317,
+    "text": "Покажи транзакции клиента с БИН 914992491366 на сумму меньше 914407 KZT от 17 марта 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='914992491366' AND amount_kzt < 914407 AND operation_date='2024-03-17';"
+  },
+  {
+    "id": 318,
+    "text": "Покажи транзакции клиента с БИН 035081541185 на сумму больше 626642 KZT от 07 февраля 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='035081541185' AND amount_kzt > 626642 AND operation_date='2025-02-07';"
+  },
+  {
+    "id": 319,
+    "text": "Покажи транзакции клиента с БИН 996586376250 на сумму больше 1040806 KZT от 25 сентября 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='996586376250' AND amount_kzt > 1040806 AND operation_date='2023-09-25';"
+  },
+  {
+    "id": 320,
+    "text": "Покажи транзакции клиента с БИН 426877729266 на сумму меньше 403273 KZT от 02 октября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='426877729266' AND amount_kzt < 403273 AND operation_date='2025-10-02';"
+  },
+  {
+    "id": 321,
+    "text": "Покажи транзакции клиента с БИН 018270874761 на сумму меньше 490910 KZT от 16 января 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='018270874761' AND amount_kzt < 490910 AND operation_date='2025-01-16';"
+  },
+  {
+    "id": 322,
+    "text": "Покажи транзакции клиента с БИН 030101820539 на сумму меньше 1066584 KZT от 27 октября 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='030101820539' AND amount_kzt < 1066584 AND operation_date='2025-10-27';"
+  },
+  {
+    "id": 323,
+    "text": "Покажи транзакции клиента с БИН 048004947476 на сумму меньше 1260558 KZT от 06 апреля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='048004947476' AND amount_kzt < 1260558 AND operation_date='2023-04-06';"
+  },
+  {
+    "id": 324,
+    "text": "Покажи транзакции клиента с БИН 983794523606 на сумму больше 889649 KZT от 18 января 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='983794523606' AND amount_kzt > 889649 AND operation_date='2024-01-18';"
+  },
+  {
+    "id": 325,
+    "text": "Покажи транзакции клиента с БИН 024967588059 на сумму меньше 605117 KZT от 08 мая 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='024967588059' AND amount_kzt < 605117 AND operation_date='2023-05-08';"
+  },
+  {
+    "id": 326,
+    "text": "Покажи транзакции клиента с БИН 933079825156 на сумму меньше 767729 KZT от 23 мая 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='933079825156' AND amount_kzt < 767729 AND operation_date='2024-05-23';"
+  },
+  {
+    "id": 327,
+    "text": "Покажи транзакции клиента с БИН 009575072434 на сумму меньше 287151 KZT от 23 октября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='009575072434' AND amount_kzt < 287151 AND operation_date='2024-10-23';"
+  },
+  {
+    "id": 328,
+    "text": "Покажи транзакции клиента с БИН 036614527068 на сумму меньше 948179 KZT от 22 апреля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='036614527068' AND amount_kzt < 948179 AND operation_date='2024-04-22';"
+  },
+  {
+    "id": 329,
+    "text": "Покажи транзакции клиента с БИН 902573868043 на сумму больше 468084 KZT от 16 августа 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='902573868043' AND amount_kzt > 468084 AND operation_date='2025-08-16';"
+  },
+  {
+    "id": 330,
+    "text": "Покажи транзакции клиента с БИН 932169386475 на сумму больше 531596 KZT от 13 января 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='932169386475' AND amount_kzt > 531596 AND operation_date='2024-01-13';"
+  },
+  {
+    "id": 330,
+    "text": "выписка по иин810922300444 сума больше 12700 тг дата 15/мар/26",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='932169386475' AND amount_kzt > 12700 AND operation_date='2026-03-15';"
+  },
+  {
+    "id": 331,
+    "text": "выписка по бин591235204306 сума более 56229 KZT дата 22.04.2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='591235204306' AND amount_kzt > 56229 AND operation_date='2023-04-22';"
+  },
+  {
+    "id": 332,
+    "text": "выписка по иин995481246868 сума больш 177913 тенге дата 21 сентября 2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='995481246868' AND amount_kzt > 177913 AND operation_date='2026-09-21';"
+  },
+  {
+    "id": 333,
+    "text": "выписка по БИН:006927602892 сума свыше 315870 тг дата 02 июня 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='006927602892' AND amount_kzt > 315870 AND operation_date='2023-06-02';"
+  },
+  {
+    "id": 334,
+    "text": "выписка по ИИН 703319329681 сума сума > 3131289 тг дата 21 мая 2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='703319329681' AND amount_kzt > 3131289 AND operation_date='2026-05-21';"
+  },
+  {
+    "id": 335,
+    "text": "выписка по БИН:009881858749 сума больше 1243241 ₸ дата 17 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='009881858749' AND amount_kzt > 1243241 AND operation_date='2023-03-17';"
+  },
+  {
+    "id": 336,
+    "text": "выписка по иин983997865414 сума более 2983014 ₸ дата 17/сен/24",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='983997865414' AND amount_kzt > 2983014 AND operation_date='2024-09-17';"
+  },
+  {
+    "id": 337,
+    "text": "выписка по иин102973957888 сума больш 3829505 тенге дата 28.01.2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='102973957888' AND amount_kzt > 3829505 AND operation_date='2023-01-28';"
+  },
+  {
+    "id": 338,
+    "text": "выписка по иин983591727652 сума сума > 4050126 тенге дата 05 апреля 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='983591727652' AND amount_kzt > 4050126 AND operation_date='2023-04-05';"
+  },
+  {
+    "id": 339,
+    "text": "выписка по иин014052722983 сума больш 208452 ₸ дата 2024-04-01",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='014052722983' AND amount_kzt > 208452 AND operation_date='2024-04-01';"
+  },
+  {
+    "id": 340,
+    "text": "выписка по бин977154329382 сума более 3489633 тг дата 17/июл/24",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='977154329382' AND amount_kzt > 3489633 AND operation_date='2024-07-17';"
+  },
+  {
+    "id": 341,
+    "text": "выписка по бин977830618293 сума свыше 486482 тг дата 16.07.2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='977830618293' AND amount_kzt > 486482 AND operation_date='2026-07-16';"
+  },
+  {
+    "id": 342,
+    "text": "выписка по БИН:971900973075 сума больше 1011962 KZT дата 06 июня 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='971900973075' AND amount_kzt > 1011962 AND operation_date='2023-06-06';"
+  },
+  {
+    "id": 343,
+    "text": "выписка по иин017347805379 сума сума > 1771290 тг дата 25.01.2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='017347805379' AND amount_kzt > 1771290 AND operation_date='2024-01-25';"
+  },
+  {
+    "id": 344,
+    "text": "выписка по иин974879745382 сума больше 4577037 ₸ дата 2026-09-01",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='974879745382' AND amount_kzt > 4577037 AND operation_date='2026-09-01';"
+  },
+  {
+    "id": 345,
+    "text": "выписка по иин639234096351 сума больш 4010009 тг дата 24 марта 2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='639234096351' AND amount_kzt > 4010009 AND operation_date='2026-03-24';"
+  },
+  {
+    "id": 346,
+    "text": "выписка по бин991405058502 сума сума > 724577 тг дата 2025-08-06",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='991405058502' AND amount_kzt > 724577 AND operation_date='2025-08-06';"
+  },
+  {
+    "id": 347,
+    "text": "выписка по ИИН 922735025020 сума более 2611754 ₸ дата 08/июл/25",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='922735025020' AND amount_kzt > 2611754 AND operation_date='2025-07-08';"
+  },
+  {
+    "id": 348,
+    "text": "выписка по ИИН 941964642468 сума более 2091346 тг дата 21.07.2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='941964642468' AND amount_kzt > 2091346 AND operation_date='2024-07-21';"
+  },
+  {
+    "id": 349,
+    "text": "выписка по иин562198679329 сума больше 2788477 ₸ дата 10.06.2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='562198679329' AND amount_kzt > 2788477 AND operation_date='2026-06-10';"
+  },
+  {
+    "id": 350,
+    "text": "выписка по БИН:983347835687 сума больше 3896923 KZT дата 10 июня 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='983347835687' AND amount_kzt > 3896923 AND operation_date='2025-06-10';"
+  },
+  {
+    "id": 351,
+    "text": "выписка по ИИН 183175598814 сума сума > 1581566 тенге дата 25 декабря 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='183175598814' AND amount_kzt > 1581566 AND operation_date='2024-12-25';"
+  },
+  {
+    "id": 352,
+    "text": "выписка по бин933261244437 сума более 2464822 тенге дата 14/ноя/25",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='933261244437' AND amount_kzt > 2464822 AND operation_date='2025-11-14';"
+  },
+  {
+    "id": 353,
+    "text": "выписка по бин947924551160 сума больше 4622213 ₸ дата 21 ноября 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='947924551160' AND amount_kzt > 4622213 AND operation_date='2024-11-21';"
+  },
+  {
+    "id": 354,
+    "text": "выписка по БИН:254490649915 сума сума > 4305357 ₸ дата 2026-06-15",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='254490649915' AND amount_kzt > 4305357 AND operation_date='2026-06-15';"
+  },
+  {
+    "id": 355,
+    "text": "выписка по бин601649606316 сума больше 1893770 ₸ дата 18.04.2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='601649606316' AND amount_kzt > 1893770 AND operation_date='2023-04-18';"
+  },
+  {
+    "id": 356,
+    "text": "выписка по БИН:024714603422 сума свыше 2285554 KZT дата 17/фев/25",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='024714603422' AND amount_kzt > 2285554 AND operation_date='2025-02-17';"
+  },
+  {
+    "id": 357,
+    "text": "выписка по бин049271860256 сума более 98371 тг дата 23 января 2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='049271860256' AND amount_kzt > 98371 AND operation_date='2026-01-23';"
+  },
+  {
+    "id": 358,
+    "text": "выписка по иин988262485961 сума больше 340024 KZT дата 28.11.2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='988262485961' AND amount_kzt > 340024 AND operation_date='2023-11-28';"
+  },
+  {
+    "id": 359,
+    "text": "выписка по иин966610911850 сума больше 37314 тг дата 23.06.2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='966610911850' AND amount_kzt > 37314 AND operation_date='2025-06-23';"
+  },
+  {
+    "id": 360,
+    "text": "выписка по бин905952542917 сума сума > 4279674 тенге дата 2023-05-03",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='905952542917' AND amount_kzt > 4279674 AND operation_date='2023-05-03';"
+  },
+  {
+    "id": 361,
+    "text": "выписка по иин001594100802 сума больш 1679873 KZT дата 02.07.2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='001594100802' AND amount_kzt > 1679873 AND operation_date='2025-07-02';"
+  },
+  {
+    "id": 362,
+    "text": "выписка по БИН:004150092724 сума больш 594718 тенге дата 2024-05-24",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='004150092724' AND amount_kzt > 594718 AND operation_date='2024-05-24';"
+  },
+  {
+    "id": 363,
+    "text": "выписка по иин975540100680 сума свыше 2879408 тг дата 25/янв/26",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='975540100680' AND amount_kzt > 2879408 AND operation_date='2026-01-25';"
+  },
+  {
+    "id": 364,
+    "text": "выписка по бин029083064014 сума более 2711764 тенге дата 27/авг/25",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='029083064014' AND amount_kzt > 2711764 AND operation_date='2025-08-27';"
+  },
+  {
+    "id": 365,
+    "text": "выписка по ИИН 047331967991 сума больше 3479808 тг дата 17.04.2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='047331967991' AND amount_kzt > 3479808 AND operation_date='2026-04-17';"
+  },
+  {
+    "id": 366,
+    "text": "выписка по БИН:941846643296 сума сума > 48239 тенге дата 20/ноя/26",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='941846643296' AND amount_kzt > 48239 AND operation_date='2026-11-20';"
+  },
+  {
+    "id": 367,
+    "text": "выписка по иин049728107385 сума больше 1163141 KZT дата 24.05.2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='049728107385' AND amount_kzt > 1163141 AND operation_date='2025-05-24';"
+  },
+  {
+    "id": 368,
+    "text": "выписка по иин507296371828 сума больш 4297706 тенге дата 2025-06-19",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='507296371828' AND amount_kzt > 4297706 AND operation_date='2025-06-19';"
+  },
+  {
+    "id": 369,
+    "text": "выписка по иин833828283403 сума более 1159443 тг дата 23/фев/24",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='833828283403' AND amount_kzt > 1159443 AND operation_date='2024-02-23';"
+  },
+  {
+    "id": 370,
+    "text": "выписка по БИН:924743248305 сума сума > 394549 тенге дата 16/май/23",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='924743248305' AND amount_kzt > 394549 AND operation_date='2023-05-16';"
+  },
+  {
+    "id": 371,
+    "text": "выписка по иин014599285641 сума сума > 1721815 тенге дата 02/ноя/26",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='014599285641' AND amount_kzt > 1721815 AND operation_date='2026-11-02';"
+  },
+  {
+    "id": 372,
+    "text": "выписка по иин019121217076 сума больше 4053712 тг дата 12 июля 2024",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='019121217076' AND amount_kzt > 4053712 AND operation_date='2024-07-12';"
+  },
+  {
+    "id": 373,
+    "text": "выписка по БИН:926355204671 сума больш 4922504 KZT дата 19 января 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='926355204671' AND amount_kzt > 4922504 AND operation_date='2023-01-19';"
+  },
+  {
+    "id": 374,
+    "text": "выписка по иин511764357377 сума более 3154980 KZT дата 11/мар/25",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='511764357377' AND amount_kzt > 3154980 AND operation_date='2025-03-11';"
+  },
+  {
+    "id": 375,
+    "text": "выписка по БИН:198839099636 сума свыше 2211668 KZT дата 07/авг/26",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='198839099636' AND amount_kzt > 2211668 AND operation_date='2026-08-07';"
+  },
+  {
+    "id": 376,
+    "text": "выписка по бин996647793169 сума свыше 2481184 ₸ дата 24 марта 2023",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='996647793169' AND amount_kzt > 2481184 AND operation_date='2023-03-24';"
+  },
+  {
+    "id": 377,
+    "text": "выписка по ИИН 926597382239 сума больше 1571006 KZT дата 19 декабря 2025",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='926597382239' AND amount_kzt > 1571006 AND operation_date='2025-12-19';"
+  },
+  {
+    "id": 378,
+    "text": "выписка по иин998783236292 сума сума > 4650608 тенге дата 19/июн/24",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='998783236292' AND amount_kzt > 4650608 AND operation_date='2024-06-19';"
+  },
+  {
+    "id": 379,
+    "text": "выписка по бин969518550879 сума сума > 3239203 ₸ дата 14 апреля 2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='969518550879' AND amount_kzt > 3239203 AND operation_date='2026-04-14';"
+  },
+  {
+    "id": 380,
+    "text": "выписка по иин952157960646 сума свыше 4268583 ₸ дата 13.02.2026",
+    "gold_sql": "SELECT * FROM afm.transactions_view WHERE payer_iin_bin='952157960646' AND amount_kzt > 4268583 AND operation_date='2026-02-13';"
+  }
+
+  
+
+]

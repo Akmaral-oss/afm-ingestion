@@ -129,13 +129,13 @@ def main() -> None:
     args = ap.parse_args()
 
     pg_dsn = args.pg or settings.pg_dsn
-    model_name = args.model if args.model is not None else settings.embedding_model_path
+    model_name = args.model if args.model is not None else settings.EMBEDDING_MODEL_PATH
     embedding_provider = (
-        args.embedding_provider if args.embedding_provider is not None else settings.embedding_provider
+        args.embedding_provider if args.embedding_provider is not None else settings.AFM_EMBEDDING_PROVIDER
     )
-    embedding_url = args.embedding_url or settings.embedding_base_url
+    embedding_url = args.embedding_url or settings.AFM_EMBEDDING_BASE_URL
     embedding_timeout = (
-        args.embedding_timeout if args.embedding_timeout is not None else settings.embedding_timeout_s
+        args.embedding_timeout if args.embedding_timeout is not None else settings.AFM_EMBEDDING_TIMEOUT_S
     )
 
     if not pg_dsn:

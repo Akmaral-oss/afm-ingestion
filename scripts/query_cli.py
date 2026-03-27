@@ -51,23 +51,23 @@ def main() -> None:
 
     setup_logging(getattr(logging, args.loglevel.upper(), logging.INFO))
 
-    pg_dsn = args.pg or settings.pg_dsn
+    pg_dsn = args.pg or settings.PG_DSN
     if not pg_dsn:
         raise SystemExit("Postgres DSN is not set. Use --pg or AFM_PG_DSN in .env.")
 
-    model_name = args.model if args.model is not None else settings.embedding_model_path
+    model_name = args.model if args.model is not None else settings.EMBEDDING_MODEL_PATH
     embedding_provider = (
-        args.embedding_provider if args.embedding_provider is not None else settings.embedding_provider
+        args.embedding_provider if args.embedding_provider is not None else settings.AFM_EMBEDDING_PROVIDER
     )
-    embedding_url = args.embedding_url or settings.embedding_base_url
+    embedding_url = args.embedding_url or settings.AFM_EMBEDDING_BASE_URL
     embedding_timeout = (
-        args.embedding_timeout if args.embedding_timeout is not None else settings.embedding_timeout_s
+        args.embedding_timeout if args.embedding_timeout is not None else settings.AFM_EMBEDDING_TIMEOUT_S
     )
-    llm_url = args.llm_url or settings.llm_base_url
-    llm_model = args.llm_model or settings.llm_model_name
-    llm_timeout = args.llm_timeout if args.llm_timeout is not None else settings.llm_timeout_s
+    llm_url = args.llm_url or settings.AFM_LLM_BASE_URL
+    llm_model = args.llm_model or settings.AFM_LLM_MODEL
+    llm_timeout = args.llm_timeout if args.llm_timeout is not None else settings.AFM_LLM_TIMEOUT_S
     llm_max_new_tokens = (
-        args.max_new_tokens if args.max_new_tokens is not None else settings.llm_max_new_tokens
+        args.max_new_tokens if args.max_new_tokens is not None else settings.AFM_LLM_MAX_NEW_TOKENS
     )
 
     ensure_schema(engine)

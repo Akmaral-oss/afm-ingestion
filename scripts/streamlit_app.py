@@ -153,7 +153,7 @@ def get_query_service():
 		embedder,
 		llm_backend,
 		intent_backend=intent_backend,
-		max_new_tokens=settings.llm_max_new_tokens,
+		max_new_tokens=settings.AFM_LLM_MAX_NEW_TOKENS,
 	)
 	return service
 

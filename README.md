@@ -110,8 +110,20 @@ The app provides:
 - reasoning panel
 - query history table
 
+
+## Docker
+Run Prometheus and Grafana:
+```
+docker compose build -up
+```
++ postgresql
++ pgadmin
+
+
 ## Notes
 
 - FastAPI app entrypoint: `app.main:app`
 - Admin panel: `http://127.0.0.1:8003/admin`
 - API docs: `http://127.0.0.1:8003/docs`
+
+

@@ -12,6 +12,7 @@ from datetime import datetime
 from io import BytesIO, StringIO
 from tempfile import NamedTemporaryFile
 from typing import Optional
+import inspect
 import re
 from uuid import uuid4
 
@@ -24,7 +25,7 @@ from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..database import get_db, async_session, async_engine
+from ..database import get_db, async_session, engine as async_engine
 from ..ingestion.pipeline import IngestionPipeline
 from ..models import Transaction, TransactionUploadMeta
 from ..schemas import (
@@ -36,7 +37,6 @@ from ..schemas import (
     TransactionImportResponse,
 )
 from ..security import decode_access_token
-
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -531,24 +531,6 @@ def _build_core_transaction_payload(
         return value
 
     op_dt: datetime = tx["date"]
-    # Ensure amount_tenge (amount_kzt) is always a valid float and not None/NaN
-    def _safe_float(val):
-        try:
-            f = float(val)
-            if f != f:  # check for NaN
-                return 0.0
-            return f
-        except Exception:
-            return 0.0
-
-    # Robustly get amount_tenge (amount_kzt) from tx dict
-    def _get_amount_tenge(tx):
-        for key in ("amount_tenge", "amount_kzt"):
-            v = tx.get(key)
-            if v is not None:
-                return _safe_float(v)
-        return 0.0
-
     payload = {
         "id": str(tx.get("id") or uuid4()),
         "file_id": file_id,
@@ -562,7 +544,7 @@ def _build_core_transaction_payload(
         "operation_date": op_dt.date(),
         "currency": (tx.get("currency") or "KZT").strip().upper(),
         "amount_currency": float(max(float(tx.get("debit") or 0), float(tx.get("credit") or 0))),
-        "amount_tenge": _get_amount_tenge(tx),
+        "amount_tenge": float(tx.get("amount_tenge") or 0),
         "credit": float(tx.get("credit") or 0),
         "debit": float(tx.get("debit") or 0),
         "direction": "credit" if float(tx.get("credit") or 0) > 0 else "debit",
@@ -1266,8 +1248,12 @@ async def import_statement(
         # The sync ingestion pipeline needs its own psycopg2 connection. Release
         # the request-scoped async connection first so tiny Postgres instances
         # don't fail with "remaining connection slots are reserved".
-        await db.close()
-        await async_engine.dispose()
+        maybe = db.close()
+        if inspect.isawaitable(maybe):
+            await maybe
+        maybe = async_engine.dispose()
+        if inspect.isawaitable(maybe):
+            await maybe
         result = await run_in_threadpool(_run_ingestion_pipeline, tmp_path, source_bank)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Ingestion pipeline failed: {exc}") from exc
