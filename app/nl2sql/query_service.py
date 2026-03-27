@@ -45,7 +45,7 @@ _ORDER_BY_CLAUSE_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _ORDER_BY_AMOUNT_RE = re.compile(
-    r"(?P<expr>(?:\b\w+\.)?amount_kzt)(?P<direction>\s+(?:ASC|DESC))?(?!\s+NULLS\s+(?:FIRST|LAST))",
+    r"(?P<expr>(?:\b\w+\.)?amount_kzt)(?P<suffix>(?:\s+(?:ASC|DESC|NULLS\s+FIRST|NULLS\s+LAST))*)",
     re.IGNORECASE,
 )
 
@@ -80,7 +80,12 @@ def _normalize_ranked_amount_sql(sql: str) -> str:
 
     def repl(match: re.Match) -> str:
         expr = match.group("expr")
-        direction = match.group("direction").upper() if match.group("direction") else ""
+        suffix = (match.group("suffix") or "").upper()
+        direction = ""
+        if "DESC" in suffix:
+            direction = " DESC"
+        elif "ASC" in suffix:
+            direction = " ASC"
         return f"{expr}{direction} NULLS LAST"
 
     updated_clause = _ORDER_BY_AMOUNT_RE.sub(repl, order_clause)
@@ -177,7 +182,10 @@ class QueryService:
                 )
                 classification = await self.intent_backend.agenerate(intent_prompt, max_new_tokens=10)
                 if "CHAT" in classification.upper() and "DATA" not in classification.upper():
-                    chat_prompt = f"User said: {question}\nReply as a helpful data assistant. Keep it short."
+                    chat_prompt = (
+                        f"User said: {question}\n"
+                        "Reply as a helpful data assistant in Russian. Keep it short."
+                    )
                     ai_reply = await self.intent_backend.agenerate(chat_prompt, max_new_tokens=400)
                     elapsed = time.perf_counter() - t0
                     return QueryResult(
@@ -265,7 +273,13 @@ class QueryService:
             else:
                 data_context = "No results."
 
-            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{data_context}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
+            sum_prompt = (
+                f"User asked: {question}\n"
+                f"SQL generated: {sql}\n"
+                f"Data sample:\n{data_context}\n\n"
+                "Provide a short, direct answer in Russian based strictly on the returned data. "
+                "Do not explain the SQL. If listing results, keep the wording concise and natural in Russian."
+            )
             try:
                 ai_summary = await self.generator.backend.agenerate(sum_prompt, max_new_tokens=400)
             except Exception as e:
@@ -307,7 +321,10 @@ class QueryService:
                 yield {"event": "status", "data": "Checking intent..."}
                 classification = await self.intent_backend.agenerate(intent_prompt, max_new_tokens=10)
                 if "CHAT" in classification.upper() and "DATA" not in classification.upper():
-                    chat_prompt = f"User said: {question}\nReply as a helpful data assistant. Keep it short."
+                    chat_prompt = (
+                        f"User said: {question}\n"
+                        "Reply as a helpful data assistant in Russian. Keep it short."
+                    )
                     
                     yield {"event": "status", "data": "Generating chat response..."}
                     ai_reply = ""
@@ -380,7 +397,13 @@ class QueryService:
             else:
                 data_context = "No results."
 
-            sum_prompt = f"User asked: {question}\nSQL generated: {sql}\nData sample:\n{data_context}\n\nProvide a short, direct natural language answer to the user's question based strictly on the returned data. Do not explain the SQL."
+            sum_prompt = (
+                f"User asked: {question}\n"
+                f"SQL generated: {sql}\n"
+                f"Data sample:\n{data_context}\n\n"
+                "Provide a short, direct answer in Russian based strictly on the returned data. "
+                "Do not explain the SQL. If listing results, keep the wording concise and natural in Russian."
+            )
             try:
                 async for chunk in self.generator.backend.astream(sum_prompt, max_new_tokens=400):
                     ai_summary += chunk
