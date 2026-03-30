@@ -22,19 +22,26 @@ def _build_async_url() -> str:
     for key, value in parse_qsl(parts.query, keep_blank_values=True):
         if key == "sslmode":
             key = "ssl"
+        # Force disable SSL for internal Docker networking
+        if key == "ssl":
+            value = "disable"
         query_items.append((key, value))
 
     scheme = parts.scheme
     if scheme == "postgresql+psycopg2":
         scheme = "postgresql+asyncpg"
-    elif scheme == "postgresql":
+    elif scheme == "postgresql" or scheme == "postgres":
         scheme = "postgresql+asyncpg"
 
+    # Reconstruct the query string from query_items
+    new_query = urlencode(query_items)
+    
+    # Return the fully reconstructed async URL
     return urlunsplit((
         scheme,
         parts.netloc,
         parts.path,
-        urlencode(query_items),
+        new_query,
         parts.fragment,
     ))
 

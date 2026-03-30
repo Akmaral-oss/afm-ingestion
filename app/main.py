@@ -20,7 +20,12 @@ from app.seed import seed_admin_if_missing
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS afm;"))
+        # Diagnostic identity check: Log who the app is actually connecting as
+        result = await conn.execute(text("SELECT CURRENT_USER, CURRENT_DATABASE();"))
+        user, db = result.fetchone()
+        print(f"INFO: Database identity: user='{user}', database='{db}'")
+        
+        # Schema creation is handled by init-db.sql, but we check if we have access
         await conn.run_sync(Base.metadata.create_all)
 
     if settings.ENABLE_SEED:

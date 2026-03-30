@@ -183,10 +183,13 @@ class GeminiBackend(LLMBackend):
                 parts=[types.Part.from_text(text=prompt)],
             )
         ]
-        tools = [types.Tool(googleSearch=types.GoogleSearch())]
+        tools = [
+            types.Tool(googleSearch=types.GoogleSearch(
+            )),
+        ]
         generate_content_config = types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(
-                thinking_level="HIGH",
+                thinking_level="LOW",
             ),
             safety_settings=[
                 types.SafetySetting(
@@ -207,6 +210,7 @@ class GeminiBackend(LLMBackend):
                 ),
             ],
             tools=tools,
+            response_mime_type="application/json",
         )
 
         chunks: list[str] = []
@@ -240,13 +244,43 @@ class GeminiBackend(LLMBackend):
         client = genai.Client(api_key=api_key)
         contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
         
-        # We need async client for true streaming, but genai library might not support it cleanly
-        # So we'll just yield the full generation as a single chunk if async streaming isn't natively trivial
+        tools = [
+            types.Tool(googleSearch=types.GoogleSearch(
+            )),
+        ]
+        generate_content_config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(
+                thinking_level="LOW",
+            ),
+            safety_settings=[
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
+            ],
+            tools=tools,
+            response_mime_type="application/json",
+        )
+        
+        # We need async client for true streaming
         import asyncio
-        # google.genai currently offers client.aio.models.generate_content_stream
         if hasattr(client, "aio"):
             async for chunk in await client.aio.models.generate_content_stream(
-                model=self.model, contents=contents
+                model=self.model,
+                contents=contents,
+                config=generate_content_config,
             ):
                 text_chunk = getattr(chunk, "text", None)
                 if text_chunk:
@@ -338,14 +372,36 @@ class SQLGenerator:
 
     @staticmethod
     def _clean(raw: str) -> str:
-        """Strip markdown fences and leading/trailing whitespace."""
-        # Extract from ```sql ... ``` if present
+        """Strip markdown fences, handle JSON wraps, and leading/trailing whitespace."""
+        # 1. Attempt to parse as JSON if it looks like a JSON object
+        trimmed = raw.strip()
+        if trimmed.startswith("{") and trimmed.endswith("}"):
+            try:
+                import json
+                data = json.loads(trimmed)
+                if isinstance(data, dict):
+                    # Take first string value that starts with SELECT
+                    for val in data.values():
+                        if isinstance(val, str) and val.upper().strip().startswith("SELECT"):
+                            return val.strip()
+            except Exception:
+                pass
+
+        # 2. Extract from ```sql ... ``` if present
         m = _CODE_FENCE_RE.search(raw)
         if m:
             return m.group(1).strip()
-        # Fallback: take everything after first SELECT
+
+        # 3. Fallback: take everything after first SELECT
         upper = raw.upper()
         idx = upper.find("SELECT")
         if idx >= 0:
-            return raw[idx:].strip()
+            query = raw[idx:].strip()
+            # Remove trailing characters common in JSON responses if they are not part of the SQL
+            # (e.g. SELECT ... LIMIT 5" ]] )
+            for char in ['"', ']', '}', '`']:
+                if query.endswith(char):
+                    query = query[:-1].strip()
+            return query
+            
         return raw.strip()

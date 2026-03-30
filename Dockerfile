@@ -16,6 +16,6 @@ RUN uv pip install --system --no-cache -r pyproject.toml
 COPY . .
 
 # Прокидываем порт
-EXPOSE 8000
+EXPOSE 8003
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]

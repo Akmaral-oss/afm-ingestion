@@ -1,4 +1,65 @@
 services:
+  app:
+    build: .
+    container_name: afm-app
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    environment:
+      - APP_ENV=development
+      - AFM_PARSER_VERSION=${AFM_PARSER_VERSION}
+      - AFM_MAX_META_LOOKBACK_ROWS=${AFM_MAX_META_LOOKBACK_ROWS}
+      - AFM_LLM_BASE_URL=${AFM_LLM_BASE_URL}
+      - AFM_LLM_MODEL=${AFM_LLM_MODEL}
+      - AFM_LLM_TIMEOUT_S=${AFM_LLM_TIMEOUT_S}
+      - AFM_INTENT_LLM_MODEL=${AFM_INTENT_LLM_MODEL}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+      - SMTP_USE_TLS=${SMTP_USE_TLS}
+      - SMTP_USE_SSL=${SMTP_USE_SSL}
+      - EMAIL_CODE_TTL_MINUTES=${EMAIL_CODE_TTL_MINUTES}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALG=${JWT_ALG}
+      - DB_POOL_SIZE=${DB_POOL_SIZE}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT}
+      - DB_POOL_RECYCLE=${DB_POOL_RECYCLE}
+      - DB_POOL_PRE_PING=${DB_POOL_PRE_PING}
+      - ENABLE_SEED=${ENABLE_SEED}
+      - NL2SQL_SAVE_HISTORY=${NL2SQL_SAVE_HISTORY}
+      - NL2SQL_ADMIN_ONLY=${NL2SQL_ADMIN_ONLY}
+      - GEMINI_API_KEY=AIzaSyDAaXVwd8dDIHrLG8O-OnfL67IYA-D9e0o
+    ports:
+      - "8003:8003"
+    restart: unless-stopped
+    networks:
+      - monitoring
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: pgvector
+    environment:
+      POSTGRES_USER: afmuser
+      POSTGRES_PASSWORD: afmpass
+      POSTGRES_DB: afmdb
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U afmuser -d afmdb" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - monitoring
   prometheus:
     image: prom/prometheus:v3.10.0
     container_name: prometheus
@@ -8,7 +69,6 @@ services:
     restart: unless-stopped
     ports:
       - 9090:9090
-
   grafana:
     image: grafana/grafana:12.3
     container_name: grafana
@@ -17,23 +77,19 @@ services:
     restart: unless-stopped
     ports:
       - 3000:3000
-
   postgres_exporter:
     image: prometheuscommunity/postgres-exporter:v0.19.0
     container_name: postgres_exporter
     restart: always
     environment:
-      DATA_SOURCE_NAME: ""
+      DATA_SOURCE_NAME: "postgresql://afmuser:afmpass@pgvector:5432/afmdb?sslmode=disable"
     networks:
       - monitoring
     ports:
       - "9187:9187"
-    
 volumes:
-  postgresdata:
   grafanadata:
   prometheusdata:
-
 networks:
   monitoring:
     driver: bridge

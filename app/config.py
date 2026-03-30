@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    DATABASE_URL: str = Field("postgresql+asyncpg://afm_user:123!@136.113.11.117:5432/afmdb?ssl=prefer", validation_alias="DATABASE_URL")
+    DATABASE_URL: str = Field("postgresql+asyncpg://afmuser:afmpass@pgvector:5432/afmdb")
     PG_DSN: str = Field("", validation_alias="AFM_PG_DSN")
 
     APP_TITLE: str = "AFM Ingestion API"
