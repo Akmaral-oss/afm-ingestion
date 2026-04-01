@@ -50,14 +50,14 @@ def _raise_with_response_details(resp) -> None:
 
 class LLMBackend(ABC):
     @abstractmethod
-    def generate(self, prompt: str, max_new_tokens: int = 512) -> str: ...
+    def generate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str: ...
     
     @abstractmethod
-    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str: ...
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str: ...
 
-    async def astream(self, prompt: str, max_new_tokens: int = 512):
+    async def astream(self, prompt: str, max_new_tokens: int = 512, **kwargs):
         """Async generator yielding chunks."""
-        yield await self.agenerate(prompt, max_new_tokens)
+        yield await self.agenerate(prompt, max_new_tokens, **kwargs)
 
 
 
@@ -85,7 +85,7 @@ class OllamaBackend(LLMBackend):
         # requests timeout=None means no timeout.
         self.timeout_s = None if timeout_s <= 0 else timeout_s
 
-    def generate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    def generate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         import requests
         resp = requests.post(
             f"{self.base_url}/api/generate",
@@ -101,7 +101,7 @@ class OllamaBackend(LLMBackend):
             _raise_with_response_details(resp)
         return resp.json()["response"]
 
-    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         import httpx
         timeout = httpx.Timeout(self.timeout_s) if self.timeout_s else None
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -118,7 +118,7 @@ class OllamaBackend(LLMBackend):
                 _raise_with_response_details(resp)
             return resp.json()["response"]
 
-    async def astream(self, prompt: str, max_new_tokens: int = 512):
+    async def astream(self, prompt: str, max_new_tokens: int = 512, **kwargs):
         import httpx
         import json
         timeout = httpx.Timeout(self.timeout_s) if self.timeout_s else None
@@ -160,7 +160,8 @@ class GeminiBackend(LLMBackend):
         self.model = model
         self.api_key_env = api_key_env
 
-    def generate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    def generate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
+        mime_type = kwargs.get('response_mime_type', 'text/plain')
         try:
             from google import genai  # type: ignore
             from google.genai import types  # type: ignore
@@ -210,7 +211,7 @@ class GeminiBackend(LLMBackend):
                 ),
             ],
             tools=tools,
-            response_mime_type="application/json",
+            response_mime_type=mime_type,
         )
 
         chunks: list[str] = []
@@ -228,12 +229,13 @@ class GeminiBackend(LLMBackend):
             raise RuntimeError("Gemini returned empty output.")
         return output
 
-    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         # For simplicity, wrap synchronous generator in an executor or use native async if available
         import asyncio
-        return await asyncio.to_thread(self.generate, prompt, max_new_tokens)
+        return await asyncio.to_thread(self.generate, prompt, max_new_tokens, **kwargs)
 
-    async def astream(self, prompt: str, max_new_tokens: int = 512):
+    async def astream(self, prompt: str, max_new_tokens: int = 512, **kwargs):
+        mime_type = kwargs.get('response_mime_type', 'text/plain')
         try:
             from google import genai  # type: ignore
             from google.genai import types  # type: ignore
@@ -271,7 +273,7 @@ class GeminiBackend(LLMBackend):
                 ),
             ],
             tools=tools,
-            response_mime_type="application/json",
+            response_mime_type=mime_type,
         )
         
         # We need async client for true streaming
@@ -286,7 +288,7 @@ class GeminiBackend(LLMBackend):
                 if text_chunk:
                     yield text_chunk
         else:
-            yield await self.agenerate(prompt, max_new_tokens)
+            yield await self.agenerate(prompt, max_new_tokens, **kwargs)
 
 
 def build_llm_backend(
@@ -339,16 +341,16 @@ class HuggingFaceBackend(LLMBackend):
             trust_remote_code=True,
         )
 
-    def generate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    def generate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         out = self._pipe(prompt, max_new_tokens=max_new_tokens, do_sample=False)
         return out[0]["generated_text"][len(prompt):]
 
-    async def agenerate(self, prompt: str, max_new_tokens: int = 512) -> str:
+    async def agenerate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         import asyncio
-        return await asyncio.to_thread(self.generate, prompt, max_new_tokens)
+        return await asyncio.to_thread(self.generate, prompt, max_new_tokens, **kwargs)
 
-    async def astream(self, prompt: str, max_new_tokens: int = 512):
-        yield await self.agenerate(prompt, max_new_tokens)
+    async def astream(self, prompt: str, max_new_tokens: int = 512, **kwargs):
+        yield await self.agenerate(prompt, max_new_tokens, **kwargs)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -361,11 +363,11 @@ class SQLGenerator:
         self.max_new_tokens = max_new_tokens
 
     def generate(self, prompt: str) -> str:
-        raw = self.backend.generate(prompt, max_new_tokens=self.max_new_tokens)
+        raw = self.backend.generate(prompt, max_new_tokens=self.max_new_tokens, response_mime_type='application/json')
         return self._clean(raw)
 
     async def agenerate(self, prompt: str) -> str:
-        raw = await self.backend.agenerate(prompt, max_new_tokens=self.max_new_tokens)
+        raw = await self.backend.agenerate(prompt, max_new_tokens=self.max_new_tokens, response_mime_type='application/json')
         return self._clean(raw)
 
     # ── helpers ───────────────────────────────────────────────────────────────

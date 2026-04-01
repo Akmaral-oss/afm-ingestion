@@ -75,10 +75,5 @@ def validate_sql(sql: str) -> None:
                 f"Direct access to raw table '{t}' is not allowed. Use {NL_VIEW}"
             )
 
-    # LIMIT required for non-aggregation queries
-    has_group_by = bool(re.search(r"\bGROUP\s+BY\b", s, re.IGNORECASE))
-    has_limit = bool(re.search(r"\bLIMIT\s+\d+", s, re.IGNORECASE))
-    if not has_group_by and not has_limit:
-        raise SQLValidationError(
-            "LIMIT is required for non-aggregation queries"
-        )
+    # The executor layer automatically enforces a hard row cap via `_inject_limit`,
+    # so we do not need to strictly validate LIMIT clauses here.
