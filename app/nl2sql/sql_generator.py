@@ -400,10 +400,13 @@ class SQLGenerator:
         if idx >= 0:
             query = raw[idx:].strip()
             # Remove trailing characters common in JSON responses if they are not part of the SQL
-            # (e.g. SELECT ... LIMIT 5" ]] )
-            for char in ['"', ']', '}', '`']:
-                if query.endswith(char):
-                    query = query[:-1].strip()
+            while True:
+                original = query
+                for char in ['"', ']', '}', '`']:
+                    if query.endswith(char):
+                        query = query[:-1].strip()
+                if query == original:
+                    break
             return query
             
         return raw.strip()
