@@ -34,7 +34,7 @@ services:
       - ENABLE_SEED=${ENABLE_SEED}
       - NL2SQL_SAVE_HISTORY=${NL2SQL_SAVE_HISTORY}
       - NL2SQL_ADMIN_ONLY=${NL2SQL_ADMIN_ONLY}
-      - GEMINI_API_KEY=AIzaSyDAaXVwd8dDIHrLG8O-OnfL67IYA-D9e0o
+      - GEMINI_API_KEY=AIzaSyC9qdDGWZDY4ik51f4Zvw0tnK-JtIeSkEs
     ports:
       - "8003:8003"
     restart: unless-stopped
