@@ -203,6 +203,13 @@ class CounterpartyTransactionsResponse(BaseModel):
     data: list[CashTransactionItem]
 
 
+class EdgeTransactionsResponse(BaseModel):
+    source: CounterpartyOut
+    target: CounterpartyOut
+    total: int
+    data: list[CashTransactionItem]
+
+
 class CounterpartyGraphNode(BaseModel):
     id: str
     label: str

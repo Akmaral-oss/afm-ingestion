@@ -30,6 +30,7 @@ from ..schemas import (
     CashTransactionsResponse,
     CashTransactionItem,
     CounterpartyTransactionsResponse,
+    EdgeTransactionsResponse,
     CounterpartyGraphResponse,
     CounterpartyGraphNode,
     CounterpartyGraphEdge,
@@ -927,13 +928,126 @@ async def counterparty_transactions(
         data=data,
     )
 
+
+@router.get("/edge-transactions", response_model=EdgeTransactionsResponse)
+async def edge_transactions(
+    source_iin_bin: str = Query(..., description="Source node IIN/BIN"),
+    target_iin_bin: str = Query(..., description="Target node IIN/BIN"),
+    limit: int = Query(200, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+):
+    source_iin_bin = _normalize_iin(source_iin_bin)
+    target_iin_bin = _normalize_iin(target_iin_bin)
+
+    if not source_iin_bin or not target_iin_bin:
+        raise HTTPException(status_code=422, detail="source_iin_bin and target_iin_bin are required")
+
+    where = or_(
+        and_(
+            Transaction.sender_iin_bin == source_iin_bin,
+            Transaction.recipient_iin_bin == target_iin_bin,
+        ),
+        and_(
+            Transaction.sender_iin_bin == target_iin_bin,
+            Transaction.recipient_iin_bin == source_iin_bin,
+        ),
+    )
+
+    total_q = select(func.count(Transaction.id)).where(where)
+    total = int((await db.execute(total_q)).scalar() or 0)
+
+    rows_q = (
+        select(Transaction)
+        .where(where)
+        .order_by(_effective_dt_expr().desc(), Transaction.id.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(rows_q)).scalars().all()
+
+    data = [
+        CashTransactionItem(
+            id=str(t.id),
+            date=_format_tx_dt(t),
+            sender_name=_resolve_display_name(t.sender_name, t.sender_account) or "—",
+            recipient_name=_resolve_display_name(t.recipient_name, t.recipient_account) or "—",
+            purpose=_fix_mojibake(t.purpose or ""),
+            currency=t.currency or "",
+            debit=float(t.debit or 0),
+            credit=float(t.credit or 0),
+            amount_tenge=float(t.amount_tenge or 0),
+        )
+        for t in rows
+    ]
+
+    source_name = None
+    target_name = None
+    for t in rows:
+        if source_name is None and _normalize_iin(t.sender_iin_bin or "") == source_iin_bin:
+            source_name = _resolve_display_name(t.sender_name, t.sender_account)
+        if target_name is None and _normalize_iin(t.recipient_iin_bin or "") == target_iin_bin:
+            target_name = _resolve_display_name(t.recipient_name, t.recipient_account)
+        if source_name and target_name:
+            break
+
+    if not source_name:
+        source_row = (
+            await db.execute(
+                select(Transaction.sender_name, Transaction.sender_account)
+                .where(Transaction.sender_iin_bin == source_iin_bin)
+                .limit(1)
+            )
+        ).first()
+        source_name = _resolve_display_name(
+            source_row[0] if source_row else None,
+            source_row[1] if source_row else None,
+        ) or source_iin_bin
+
+    if not target_name:
+        target_row = (
+            await db.execute(
+                select(Transaction.recipient_name, Transaction.recipient_account)
+                .where(Transaction.recipient_iin_bin == target_iin_bin)
+                .limit(1)
+            )
+        ).first()
+        target_name = _resolve_display_name(
+            target_row[0] if target_row else None,
+            target_row[1] if target_row else None,
+        ) or target_iin_bin
+
+    return EdgeTransactionsResponse(
+        source=CounterpartyOut(name=_fix_mojibake(source_name), iin_bin=source_iin_bin, account=""),
+        target=CounterpartyOut(name=_fix_mojibake(target_name), iin_bin=target_iin_bin, account=""),
+        total=total,
+        data=data,
+    )
+
+def _parse_graph_limit(value: str, *, name: str, min_value: int = 1, max_value: int | None = None) -> int | None:
+    raw = str(value or "").strip().lower()
+    if raw == "max":
+        return None
+
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"{name} must be an integer or 'max'") from exc
+
+    if parsed < min_value:
+        raise HTTPException(status_code=422, detail=f"{name} must be >= {min_value}")
+    if max_value is not None and parsed > max_value:
+        raise HTTPException(status_code=422, detail=f"{name} must be <= {max_value} or 'max'")
+    return parsed
+
+
 @router.get("/counterparty-graph", response_model=CounterpartyGraphResponse)
 async def counterparty_graph(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
-    depth: int = Query(2, ge=1, le=3),
-    max_neighbors: int = Query(6, ge=1, le=20),
+    depth: str = Query("2", description="Depth level or 'max'"),
+    max_neighbors: str = Query("6", description="Max neighbors per node or 'max'"),
     db: AsyncSession = Depends(get_db),
 ):
+    depth_limit = _parse_graph_limit(depth, name="depth", min_value=1)
+    neighbors_limit = _parse_graph_limit(max_neighbors, name="max_neighbors", min_value=1, max_value=20)
     iin_bin = _normalize_iin(iin_bin)
     node_meta: dict[str, dict] = {
         iin_bin: {"label": iin_bin, "level": 0, "total_turnover": 0.0}
@@ -942,8 +1056,9 @@ async def counterparty_graph(
 
     frontier = {iin_bin}
     visited = {iin_bin}
+    level = 1
 
-    for level in range(1, depth + 1):
+    while frontier and (depth_limit is None or level <= depth_limit):
         next_frontier = set()
         for current in frontier:
             in_q = (
@@ -991,7 +1106,9 @@ async def counterparty_graph(
                 agg.items(),
                 key=lambda item: item[1]["amount"],
                 reverse=True,
-            )[:max_neighbors]
+            )
+            if neighbors_limit is not None:
+                top_neighbors = top_neighbors[:neighbors_limit]
 
             for neighbor_iin, info in top_neighbors:
                 edge_key = tuple(sorted((current, neighbor_iin)))
@@ -1020,8 +1137,7 @@ async def counterparty_graph(
             node_meta[current]["total_turnover"] += sum(item[1]["amount"] for item in top_neighbors)
 
         frontier = next_frontier
-        if not frontier:
-            break
+        level += 1
 
     center_name_q = select(Transaction.sender_name, Transaction.sender_account).where(Transaction.sender_iin_bin == iin_bin).limit(1)
     center_row = (await db.execute(center_name_q)).first()
