@@ -171,6 +171,16 @@ class TopCounterpartiesResponse(BaseModel):
     data: list[TopCounterpartyItem]
 
 
+class CounterpartySearchItem(BaseModel):
+    counterparty: CounterpartyOut
+    total_turnover: float
+    transaction_count: int
+
+
+class CounterpartySearchResponse(BaseModel):
+    data: list[CounterpartySearchItem]
+
+
 class CashTransactionItem(BaseModel):
     id: str
     date: str

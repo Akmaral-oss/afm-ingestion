@@ -61,19 +61,25 @@ class EmbeddingBackend:
 
     def embed(self, texts: List[str]) -> np.ndarray:
         if not texts:
-            return np.zeros((0, 1), dtype=np.float32)
+            return self._zero_embeddings(0)
 
         if not self.enabled:
-            return np.zeros((len(texts), 1), dtype=np.float32)
+            return self._zero_embeddings(len(texts))
 
-        if self._resolved_provider == "ollama":
-            return self._embed_ollama(texts)
+        try:
+            if self._resolved_provider == "ollama":
+                return self._embed_ollama(texts)
 
-        if self.model is None:
-            return np.zeros((len(texts), 1), dtype=np.float32)
+            if self.model is None:
+                return self._zero_embeddings(len(texts))
 
-        vecs = self.model.encode(texts, normalize_embeddings=True)
-        return np.asarray(vecs, dtype=np.float32)
+            vecs = self.model.encode(texts, normalize_embeddings=True)
+            return np.asarray(vecs, dtype=np.float32)
+        except Exception as e:
+            log.warning("Embedding request failed; disabling embeddings for this runtime: %s", e)
+            self.enabled = False
+            self._resolved_provider = "disabled"
+            return self._zero_embeddings(len(texts))
 
     def _init_ollama(self, model_name: str) -> bool:
         try:
@@ -117,8 +123,8 @@ class EmbeddingBackend:
             embeddings = payload.get("embeddings")
             if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
                 return np.asarray(embeddings, dtype=np.float32)
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Ollama batch embedding failed, falling back to single requests: %s", e)
 
         vectors = [self._embed_ollama_single(self.model_name_or_path or _DEFAULT_OLLAMA_EMBEDDING_MODEL, t) for t in texts]
         return np.asarray(vectors, dtype=np.float32)
@@ -146,3 +152,7 @@ class EmbeddingBackend:
     @staticmethod
     def bytes_to_vec(b: bytes) -> np.ndarray:
         return np.frombuffer(b, dtype=np.float32)
+
+    def _zero_embeddings(self, count: int) -> np.ndarray:
+        width = int(self.dim or 1)
+        return np.zeros((count, width), dtype=np.float32)

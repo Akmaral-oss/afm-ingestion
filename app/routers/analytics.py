@@ -27,6 +27,8 @@ from ..schemas import (
     CounterpartyOut,
     TopCounterpartiesResponse,
     TopCounterpartyItem,
+    CounterpartySearchResponse,
+    CounterpartySearchItem,
     CashTransactionsResponse,
     CashTransactionItem,
     CounterpartyTransactionsResponse,
@@ -664,6 +666,128 @@ async def top_counterparties(
     ]
 
     return TopCounterpartiesResponse(data=results)
+
+
+@router.get("/counterparty-search", response_model=CounterpartySearchResponse)
+async def counterparty_search(
+    q: str = Query(..., min_length=2, description="Partial counterparty name, IIN/BIN or account"),
+    limit: int = Query(8, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    query_text = (q or "").strip()
+    lowered_like = f"%{query_text.lower()}%"
+    norm_iin = _normalize_iin(query_text)
+    norm_acc = _normalize_account(query_text)
+
+    sender_display = _display_name_expr(Transaction.sender_name, Transaction.sender_account)
+    sender_iin = func.upper(func.coalesce(Transaction.sender_iin_bin, ""))
+    sender_acc = _normalized_account_expr(Transaction.sender_account)
+    sender_has_iin = and_(sender_iin != "", sender_iin != "0", sender_iin != "000000000000")
+    sender_has_acc = sender_acc != ""
+    sender_key = case(
+        (sender_has_iin, literal("iin:") + sender_iin),
+        (sender_has_acc, literal("acc:") + sender_acc),
+        else_=literal("name:") + sender_display,
+    )
+    sender_account_out = case((sender_has_iin, literal("")), else_=sender_acc)
+    sender_iin_out = case((sender_has_iin, sender_iin), else_=literal(""))
+    sender_match_filters = [func.lower(sender_display).like(lowered_like)]
+    if norm_iin:
+        sender_match_filters.append(sender_iin.like(f"%{norm_iin}%"))
+    if norm_acc:
+        sender_match_filters.append(sender_acc.like(f"%{norm_acc}%"))
+
+    recipient_display = _display_name_expr(Transaction.recipient_name, Transaction.recipient_account)
+    recipient_iin = func.upper(func.coalesce(Transaction.recipient_iin_bin, ""))
+    recipient_acc = _normalized_account_expr(Transaction.recipient_account)
+    recipient_has_iin = and_(recipient_iin != "", recipient_iin != "0", recipient_iin != "000000000000")
+    recipient_has_acc = recipient_acc != ""
+    recipient_key = case(
+        (recipient_has_iin, literal("iin:") + recipient_iin),
+        (recipient_has_acc, literal("acc:") + recipient_acc),
+        else_=literal("name:") + recipient_display,
+    )
+    recipient_account_out = case((recipient_has_iin, literal("")), else_=recipient_acc)
+    recipient_iin_out = case((recipient_has_iin, recipient_iin), else_=literal(""))
+    recipient_match_filters = [func.lower(recipient_display).like(lowered_like)]
+    if norm_iin:
+        recipient_match_filters.append(recipient_iin.like(f"%{norm_iin}%"))
+    if norm_acc:
+        recipient_match_filters.append(recipient_acc.like(f"%{norm_acc}%"))
+
+    sender_side = (
+        select(
+            sender_key.label("cp_key"),
+            sender_display.label("cp_name"),
+            sender_iin_out.label("iin_bin"),
+            sender_account_out.label("account"),
+            func.coalesce(func.sum(Transaction.amount_tenge), 0).label("total_turnover"),
+            func.count(Transaction.id).label("transaction_count"),
+        )
+        .where(
+            and_(
+                sender_display.isnot(None),
+                sender_display != "",
+                or_(sender_has_iin, sender_has_acc),
+                or_(*sender_match_filters),
+            )
+        )
+        .group_by(sender_key, sender_display, sender_iin_out, sender_account_out)
+    )
+
+    recipient_side = (
+        select(
+            recipient_key.label("cp_key"),
+            recipient_display.label("cp_name"),
+            recipient_iin_out.label("iin_bin"),
+            recipient_account_out.label("account"),
+            func.coalesce(func.sum(Transaction.amount_tenge), 0).label("total_turnover"),
+            func.count(Transaction.id).label("transaction_count"),
+        )
+        .where(
+            and_(
+                recipient_display.isnot(None),
+                recipient_display != "",
+                or_(recipient_has_iin, recipient_has_acc),
+                or_(*recipient_match_filters),
+            )
+        )
+        .group_by(recipient_key, recipient_display, recipient_iin_out, recipient_account_out)
+    )
+
+    combined = union_all(sender_side, recipient_side).subquery()
+    rows = (
+        await db.execute(
+            select(
+                func.max(combined.c.cp_name).label("cp_name"),
+                func.max(combined.c.iin_bin).label("iin_bin"),
+                func.max(combined.c.account).label("account"),
+                func.coalesce(func.sum(combined.c.total_turnover), 0).label("total_turnover"),
+                func.coalesce(func.sum(combined.c.transaction_count), 0).label("transaction_count"),
+            )
+            .group_by(combined.c.cp_key)
+            .order_by(
+                func.sum(combined.c.total_turnover).desc(),
+                func.sum(combined.c.transaction_count).desc(),
+            )
+            .limit(limit)
+        )
+    ).all()
+
+    return CounterpartySearchResponse(
+        data=[
+            CounterpartySearchItem(
+                counterparty=CounterpartyOut(
+                    name=_fix_mojibake(row.cp_name or "—"),
+                    iin_bin=row.iin_bin or "",
+                    account=row.account or "",
+                ),
+                total_turnover=float(row.total_turnover or 0),
+                transaction_count=int(row.transaction_count or 0),
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.get("/category-summary", response_model=CategorySummaryResponse)
