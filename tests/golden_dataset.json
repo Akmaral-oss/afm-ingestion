@@ -1,0 +1,1320 @@
+[
+  {
+    "id": "A-01",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "покажи последние 20 транзакций",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY operation_date DESC\nLIMIT 20;",
+    "check_sql_contains": [
+      "ORDER BY",
+      "operation_date",
+      "DESC",
+      "LIMIT 20"
+    ],
+    "check_rows_eq": 20
+  },
+  {
+    "id": "A-02",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "покажи все транзакции банка kaspi",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE source_bank = 'kaspi'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "source_bank",
+      "kaspi"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-03",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "все транзакции banка halyk",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE source_bank = 'halyk'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "source_bank",
+      "halyk"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-04",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "транзакции за 2024 год",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "2024-01-01",
+      "2024-12-31",
+      "BETWEEN"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-05",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "транзакции между 1 января 2023 и 31 марта 2023",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2023-01-01' AND '2023-03-31'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "BETWEEN",
+      "2023-01-01",
+      "2023-03-31"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-06",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "все транзакции в KZT",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE currency = 'KZT'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "currency",
+      "KZT"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-07",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "найди транзакции где валюта не KZT",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, currency, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE currency != 'KZT' AND currency IS NOT NULL\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "currency",
+      "KZT"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-08",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "найди транзакции где получатель содержит слово Kaspi",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(receiver_name,'')) LIKE '%kaspi%'\n   OR LOWER(COALESCE(receiver_bank,'')) LIKE '%kaspi%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "receiver_name",
+      "%kaspi%"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-09",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "покажи транзакции на сумму больше миллиона тенге",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt > 1000000\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "1000000"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "A-10",
+    "difficulty": "easy",
+    "group": "filter",
+    "question": "транзакции за январь 2024",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-01-01' AND '2024-01-31'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "2024-01-01",
+      "2024-01-31"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "B-01",
+    "difficulty": "easy",
+    "group": "aggregation",
+    "question": "сколько всего транзакций в базе",
+    "gold_sql": "SELECT COUNT(*) AS total_transactions\nFROM afm.transactions_nl_view;",
+    "check_sql_contains": [
+      "COUNT"
+    ],
+    "check_rows_eq": 1,
+    "check_value_gt": {
+      "col": "total_transactions",
+      "val": 1000
+    }
+  },
+  {
+    "id": "B-02",
+    "difficulty": "easy",
+    "group": "aggregation",
+    "question": "сколько транзакций по каждому банку",
+    "gold_sql": "SELECT source_bank, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nGROUP BY source_bank\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "GROUP BY",
+      "source_bank",
+      "COUNT"
+    ],
+    "check_rows_gt": 1
+  },
+  {
+    "id": "B-03",
+    "difficulty": "easy",
+    "group": "aggregation",
+    "question": "сколько транзакций по каждой валюте",
+    "gold_sql": "SELECT currency, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE currency IS NOT NULL\nGROUP BY currency\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "GROUP BY",
+      "currency",
+      "COUNT"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "B-04",
+    "difficulty": "medium",
+    "group": "aggregation",
+    "question": "общая сумма транзакций в тенге",
+    "gold_sql": "SELECT SUM(amount_kzt) AS total_kzt\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL;",
+    "check_sql_contains": [
+      "SUM",
+      "amount_kzt",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "B-05",
+    "difficulty": "medium",
+    "group": "aggregation",
+    "question": "средняя сумма транзакции в KZT",
+    "gold_sql": "SELECT AVG(amount_kzt) AS avg_kzt\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL;",
+    "check_sql_contains": [
+      "AVG",
+      "amount_kzt",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "B-06",
+    "difficulty": "medium",
+    "group": "aggregation",
+    "question": "максимальная и минимальная сумма транзакции",
+    "gold_sql": "SELECT MAX(amount_kzt) AS max_amount, MIN(amount_kzt) AS min_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL;",
+    "check_sql_contains": [
+      "MAX",
+      "MIN",
+      "amount_kzt"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "B-07",
+    "difficulty": "hard",
+    "group": "aggregation",
+    "question": "медианная сумма транзакции",
+    "gold_sql": "SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount_kzt) AS median_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL;",
+    "check_sql_contains": [
+      "PERCENTILE_CONT",
+      "0.5",
+      "amount_kzt"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "B-08",
+    "difficulty": "medium",
+    "group": "aggregation",
+    "question": "сколько транзакций по месяцам за всё время",
+    "gold_sql": "SELECT DATE_TRUNC('month', operation_date) AS month, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL\nGROUP BY DATE_TRUNC('month', operation_date)\nORDER BY month ASC;",
+    "check_sql_contains": [
+      "DATE_TRUNC",
+      "month",
+      "operation_date",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 5
+  },
+  {
+    "id": "B-09",
+    "difficulty": "medium",
+    "group": "aggregation",
+    "question": "общий оборот по каждому банку",
+    "gold_sql": "SELECT source_bank, SUM(amount_kzt) AS total_oborot\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY source_bank\nORDER BY total_oborot DESC;",
+    "check_sql_contains": [
+      "SUM",
+      "amount_kzt",
+      "GROUP BY",
+      "source_bank",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 1
+  },
+  {
+    "id": "B-10",
+    "difficulty": "hard",
+    "group": "aggregation",
+    "question": "аномально крупные транзакции выше 99 перцентиля",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt > (\n    SELECT PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY amount_kzt)\n    FROM afm.transactions_nl_view\n    WHERE amount_kzt IS NOT NULL\n)\nORDER BY amount_kzt DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "PERCENTILE_CONT",
+      "0.99",
+      "amount_kzt"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "C-01",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "все входящие транзакции за апрель 2024",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-04-01' AND '2024-04-30'\n  AND (direction = 'credit'\n    OR operation_type_raw ILIKE '%вх%'\n    OR operation_type_raw ILIKE '%кредит%'\n    OR amount_credit > 0)\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "2024-04-01",
+      "2024-04-30"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "C-02",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "все исходящие транзакции за апрель 2024",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-04-01' AND '2024-04-30'\n  AND (direction = 'debit'\n    OR direction IS NULL\n    OR operation_type_raw ILIKE '%исх%'\n    OR operation_type_raw ILIKE '%дебет%')\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "2024-04-01",
+      "2024-04-30"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "C-03",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "топ 10 самых крупных входящих операций",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'credit'\n    OR operation_type_raw ILIKE '%вх%'\n    OR operation_type_raw ILIKE '%кредит%')\nORDER BY amount_kzt DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "DESC",
+      "LIMIT 10"
+    ],
+    "check_rows_eq": 10
+  },
+  {
+    "id": "C-04",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "топ 10 самых крупных исходящих операций",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'debit'\n    OR direction IS NULL\n    OR operation_type_raw ILIKE '%исх%')\nORDER BY amount_kzt DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "DESC",
+      "LIMIT 10"
+    ],
+    "check_rows_eq": 10
+  },
+  {
+    "id": "C-05",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "сумма входящих по каждому клиенту",
+    "gold_sql": "SELECT client_name, SUM(amount_kzt) AS total_incoming\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\nGROUP BY client_name\nORDER BY total_incoming DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "SUM",
+      "GROUP BY",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "C-06",
+    "difficulty": "medium",
+    "group": "direction",
+    "question": "сумма исходящих по каждому клиенту",
+    "gold_sql": "SELECT client_name, SUM(amount_kzt) AS total_outgoing\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'debit' OR direction IS NULL OR operation_type_raw ILIKE '%исх%')\nGROUP BY client_name\nORDER BY total_outgoing DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "SUM",
+      "GROUP BY",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "C-07",
+    "difficulty": "hard",
+    "group": "direction",
+    "question": "с какого банка больше всего входящих по сумме",
+    "gold_sql": "SELECT source_bank, SUM(amount_kzt) AS total_incoming\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\nGROUP BY source_bank\nORDER BY total_incoming DESC\nLIMIT 1;",
+    "check_sql_contains": [
+      "source_bank",
+      "SUM",
+      "GROUP BY"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "C-08",
+    "difficulty": "hard",
+    "group": "direction",
+    "question": "дни когда сумма исходящих была больше суммы входящих",
+    "gold_sql": "SELECT operation_date,\n    SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%' THEN COALESCE(amount_kzt,0) ELSE 0 END) AS incoming,\n    SUM(CASE WHEN direction='debit' OR direction IS NULL OR operation_type_raw ILIKE '%исх%' THEN COALESCE(amount_kzt,0) ELSE 0 END) AS outgoing\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL\nGROUP BY operation_date\nHAVING SUM(CASE WHEN direction='debit' OR direction IS NULL OR operation_type_raw ILIKE '%исх%' THEN COALESCE(amount_kzt,0) ELSE 0 END)\n     > SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%' THEN COALESCE(amount_kzt,0) ELSE 0 END)\nORDER BY operation_date DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "CASE",
+      "WHEN",
+      "GROUP BY",
+      "HAVING"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "D-01",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "топ 10 плательщиков по сумме",
+    "gold_sql": "SELECT payer_name, SUM(amount_kzt) AS total_sent, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND payer_name IS NOT NULL\nGROUP BY payer_name\nORDER BY total_sent DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "payer_name",
+      "SUM",
+      "GROUP BY",
+      "LIMIT 10",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 10
+  },
+  {
+    "id": "D-02",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "топ 10 получателей по сумме",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) AS total_received, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND receiver_name IS NOT NULL\nGROUP BY receiver_name\nORDER BY total_received DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "receiver_name",
+      "SUM",
+      "GROUP BY",
+      "LIMIT 10",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 10
+  },
+  {
+    "id": "D-03",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "сколько уникальных плательщиков в базе",
+    "gold_sql": "SELECT COUNT(DISTINCT payer_name) AS unique_payers\nFROM afm.transactions_nl_view\nWHERE payer_name IS NOT NULL;",
+    "check_sql_contains": [
+      "COUNT",
+      "DISTINCT",
+      "payer_name"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "D-04",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "сколько уникальных получателей в базе",
+    "gold_sql": "SELECT COUNT(DISTINCT receiver_name) AS unique_receivers\nFROM afm.transactions_nl_view\nWHERE receiver_name IS NOT NULL;",
+    "check_sql_contains": [
+      "COUNT",
+      "DISTINCT",
+      "receiver_name"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "D-05",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "топ 5 плательщиков по количеству транзакций",
+    "gold_sql": "SELECT payer_name, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE payer_name IS NOT NULL\nGROUP BY payer_name\nORDER BY tx_count DESC\nLIMIT 5;",
+    "check_sql_contains": [
+      "payer_name",
+      "COUNT",
+      "GROUP BY",
+      "LIMIT 5"
+    ],
+    "check_rows_eq": 5
+  },
+  {
+    "id": "D-06",
+    "difficulty": "easy",
+    "group": "counterparty",
+    "question": "топ 5 получателей по количеству транзакций",
+    "gold_sql": "SELECT receiver_name, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE receiver_name IS NOT NULL\nGROUP BY receiver_name\nORDER BY tx_count DESC\nLIMIT 5;",
+    "check_sql_contains": [
+      "receiver_name",
+      "COUNT",
+      "GROUP BY",
+      "LIMIT 5"
+    ],
+    "check_rows_eq": 5
+  },
+  {
+    "id": "D-07",
+    "difficulty": "medium",
+    "group": "counterparty",
+    "question": "все транзакции где плательщик САЙБОЛ РУФИНА",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(payer_name,'')) LIKE '%сайбол руфина%'\n   OR LOWER(COALESCE(payer_name,'')) LIKE '%saybel%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "payer_name"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "D-08",
+    "difficulty": "medium",
+    "group": "counterparty",
+    "question": "найди пары плательщик получатель с более 5 транзакциями",
+    "gold_sql": "SELECT payer_name, receiver_name, COUNT(*) AS tx_count, SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE payer_name IS NOT NULL AND receiver_name IS NOT NULL AND amount_kzt IS NOT NULL\nGROUP BY payer_name, receiver_name\nHAVING COUNT(*) > 5\nORDER BY tx_count DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "payer_name",
+      "receiver_name",
+      "GROUP BY",
+      "HAVING",
+      "COUNT"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "D-09",
+    "difficulty": "medium",
+    "group": "counterparty",
+    "question": "какой получатель имеет больше всего входящих переводов",
+    "gold_sql": "SELECT receiver_name, COUNT(*) AS tx_count, SUM(amount_kzt) AS total\nFROM afm.transactions_nl_view\nWHERE receiver_name IS NOT NULL AND amount_kzt IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\nGROUP BY receiver_name\nORDER BY total DESC\nLIMIT 1;",
+    "check_sql_contains": [
+      "receiver_name",
+      "SUM",
+      "GROUP BY",
+      "LIMIT 1"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "D-10",
+    "difficulty": "medium",
+    "group": "counterparty",
+    "question": "общая сумма по каждому контрагенту за 2024 год",
+    "gold_sql": "SELECT receiver_name, SUM(amount_kzt) AS total_amount, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31'\n  AND amount_kzt IS NOT NULL\n  AND receiver_name IS NOT NULL\nGROUP BY receiver_name\nORDER BY total_amount DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "receiver_name",
+      "SUM",
+      "GROUP BY",
+      "2024",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-01",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все возвраты средств",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%возврат%'\n   OR LOWER(COALESCE(raw_note,'')) LIKE '%возврат%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "%возврат%"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-02",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все платежи card to card",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%card to card%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%cald to cald%'\n   OR LOWER(COALESCE(raw_note,'')) LIKE '%card to card%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "card"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-03",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все операции снятия наличных",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%наличн%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%банкомат%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%бан%'\n   OR LOWER(COALESCE(operation_type_raw,'')) LIKE '%atm%'\n   OR LOWER(COALESCE(operation_type_raw,'')) LIKE '%ch debit%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-04",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все операции с кодом назначения 119",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE purpose_code::text = '119' OR purpose_code::text LIKE '119%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_code",
+      "119"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-05",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все операции с кодом назначения 191",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE purpose_code::text = '191' OR purpose_code::text LIKE '191%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_code",
+      "191"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-06",
+    "difficulty": "medium",
+    "group": "purpose",
+    "question": "сумма по каждому коду назначения платежа",
+    "gold_sql": "SELECT purpose_code, COUNT(*) AS tx_count, SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND purpose_code IS NOT NULL\nGROUP BY purpose_code\nORDER BY total_amount DESC;",
+    "check_sql_contains": [
+      "purpose_code",
+      "SUM",
+      "GROUP BY",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-07",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все операции по займу или кредиту",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%займ%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%заем%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%кредит%'\n   OR LOWER(COALESCE(raw_note,'')) LIKE '%займ%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "%займ%"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-08",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди все пенсионные выплаты",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%пенсион%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%енпф%'\n   OR LOWER(COALESCE(raw_note,'')) LIKE '%пенсион%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "%пенсион%"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "E-09",
+    "difficulty": "medium",
+    "group": "purpose",
+    "question": "топ 20 самых частых назначений платежей",
+    "gold_sql": "SELECT purpose_text, COUNT(*) AS frequency\nFROM afm.transactions_nl_view\nWHERE purpose_text IS NOT NULL\nGROUP BY purpose_text\nORDER BY frequency DESC\nLIMIT 20;",
+    "check_sql_contains": [
+      "purpose_text",
+      "COUNT",
+      "GROUP BY",
+      "LIMIT 20"
+    ],
+    "check_rows_eq": 20
+  },
+  {
+    "id": "E-10",
+    "difficulty": "easy",
+    "group": "purpose",
+    "question": "найди продажи с kaspi.kz",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%kaspi.kz%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%продажи%kaspi%'\n   OR LOWER(COALESCE(raw_note,'')) LIKE '%kaspi.kz%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "kaspi"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-01",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "покажи все транзакции клиента ASYLBEK BOLAT",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(client_name,'')) LIKE '%asylbek bolat%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "client_name",
+      "asylbek"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-02",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "сколько всего выписок в базе",
+    "gold_sql": "SELECT COUNT(DISTINCT account_iban) AS total_statements\nFROM afm.transactions_nl_view\nWHERE account_iban IS NOT NULL;",
+    "check_sql_contains": [
+      "COUNT",
+      "DISTINCT"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "F-03",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "сколько выписок по каждому банку",
+    "gold_sql": "SELECT source_bank, COUNT(DISTINCT account_iban) AS statement_count\nFROM afm.transactions_nl_view\nWHERE account_iban IS NOT NULL\nGROUP BY source_bank\nORDER BY statement_count DESC;",
+    "check_sql_contains": [
+      "COUNT",
+      "DISTINCT",
+      "source_bank",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 1
+  },
+  {
+    "id": "F-04",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "общая сумма транзакций по каждому клиенту",
+    "gold_sql": "SELECT client_name, COUNT(*) AS tx_count, SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY client_name\nORDER BY total_amount DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "SUM",
+      "GROUP BY",
+      "IS NOT NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-05",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "топ 10 клиентов по объёму входящих транзакций",
+    "gold_sql": "SELECT client_name, SUM(amount_kzt) AS total_incoming\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\nGROUP BY client_name\nORDER BY total_incoming DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "client_name",
+      "SUM",
+      "GROUP BY",
+      "LIMIT 10"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-06",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "найди выписки с самым большим исходящим остатком",
+    "gold_sql": "SELECT DISTINCT client_name, account_iban, closing_balance\nFROM afm.transactions_nl_view\nWHERE closing_balance IS NOT NULL\nORDER BY closing_balance DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "client_name",
+      "closing_balance",
+      "ORDER BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-07",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "покажи все транзакции по IBAN KZ10722C000086031993",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, direction, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE account_iban = 'KZ10722C000086031993'\n   OR payer_account LIKE '%KZ10722C000086031993%'\n   OR receiver_account LIKE '%KZ10722C000086031993%'\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "KZ10722C000086031993"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-08",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "для каждого клиента покажи число выписок и число транзакций",
+    "gold_sql": "SELECT client_name,\n    COUNT(DISTINCT account_iban) AS statement_count,\n    COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE client_name IS NOT NULL\nGROUP BY client_name\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "COUNT",
+      "DISTINCT",
+      "account_iban",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "F-09",
+    "difficulty": "medium",
+    "group": "client",
+    "question": "самая ранняя и поздняя дата операции",
+    "gold_sql": "SELECT MIN(operation_date) AS earliest, MAX(operation_date) AS latest\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL;",
+    "check_sql_contains": [
+      "MIN",
+      "MAX",
+      "operation_date"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "F-10",
+    "difficulty": "hard",
+    "group": "client",
+    "question": "покажи клиентов у которых несколько счетов",
+    "gold_sql": "SELECT client_name, COUNT(DISTINCT account_iban) AS account_count\nFROM afm.transactions_nl_view\nWHERE client_name IS NOT NULL AND account_iban IS NOT NULL\nGROUP BY client_name\nHAVING COUNT(DISTINCT account_iban) > 1\nORDER BY account_count DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "COUNT",
+      "DISTINCT",
+      "HAVING"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "G-01",
+    "difficulty": "hard",
+    "group": "entity_type",
+    "question": "сравни операции физических и юридических лиц",
+    "gold_sql": "SELECT\n    CASE\n        WHEN SUBSTRING(COALESCE(payer_iin_bin,'000000000000'),5,1) IN ('4','5') THEN 'ЮЛ'\n        WHEN SUBSTRING(COALESCE(payer_iin_bin,'000000000000'),5,1) = '6' THEN 'ИП'\n        WHEN LOWER(COALESCE(payer_name,'')) SIMILAR TO '%(тоо|зао|ооо|ип )%' THEN 'ЮЛ/ИП'\n        ELSE 'ФЛ'\n    END AS entity_type,\n    COUNT(*) AS tx_count,\n    SUM(amount_kzt) AS total_amount,\n    AVG(amount_kzt) AS avg_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY entity_type\nORDER BY total_amount DESC;",
+    "check_sql_contains": [
+      "CASE",
+      "WHEN",
+      "payer_iin_bin",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 1
+  },
+  {
+    "id": "G-02",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "общая сумма операций юридических лиц",
+    "gold_sql": "SELECT SUM(amount_kzt) AS total_ul\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (SUBSTRING(COALESCE(payer_iin_bin,'000000000000'),5,1) IN ('4','5','6')\n    OR LOWER(COALESCE(payer_name,'')) SIMILAR TO '%(тоо|ао |зао|ооо|ип )%');",
+    "check_sql_contains": [
+      "SUM",
+      "amount_kzt",
+      "payer_iin_bin"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "G-03",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "сколько транзакций от нерезидентов",
+    "gold_sql": "SELECT COUNT(*) AS nonresident_count\nFROM afm.transactions_nl_view\nWHERE payer_residency IS NOT NULL\n  AND LOWER(payer_residency) NOT IN ('резидент','казахстан','');",
+    "check_sql_contains": [
+      "payer_residency",
+      "COUNT"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "G-04",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "сколько денег пришло от нерезидентов",
+    "gold_sql": "SELECT SUM(amount_kzt) AS total_from_nonresident\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\n  AND payer_residency IS NOT NULL\n  AND LOWER(payer_residency) NOT IN ('резидент','казахстан','');",
+    "check_sql_contains": [
+      "payer_residency",
+      "SUM",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "G-05",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "топ 5 стран по сумме входящих платежей",
+    "gold_sql": "SELECT payer_residency, SUM(amount_kzt) AS total_incoming\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND payer_residency IS NOT NULL\n  AND (direction = 'credit' OR operation_type_raw ILIKE '%вх%')\nGROUP BY payer_residency\nORDER BY total_incoming DESC\nLIMIT 5;",
+    "check_sql_contains": [
+      "payer_residency",
+      "SUM",
+      "GROUP BY",
+      "LIMIT 5"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "G-06",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "найди операции где плательщик из Индии",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, payer_residency, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(payer_residency,'')) LIKE '%инди%'\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "payer_residency",
+      "%инди%"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "G-07",
+    "difficulty": "medium",
+    "group": "entity_type",
+    "question": "сколько денег ушло нерезидентам",
+    "gold_sql": "SELECT SUM(amount_kzt) AS total_to_nonresident\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\n  AND (direction = 'debit' OR operation_type_raw ILIKE '%исх%')\n  AND receiver_residency IS NOT NULL\n  AND LOWER(receiver_residency) NOT IN ('резидент','казахстан','');",
+    "check_sql_contains": [
+      "receiver_residency",
+      "SUM",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "H-01",
+    "difficulty": "medium",
+    "group": "risk",
+    "question": "транзакции снятия наличных через банкомат",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%банкомат%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%наличн%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%бан%'\n   OR LOWER(COALESCE(operation_type_raw,'')) LIKE '%ch debit%'\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-02",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "операции card to card на сумму больше миллиона",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt > 1000000\n  AND (LOWER(COALESCE(purpose_text,'')) LIKE '%card to card%'\n    OR LOWER(COALESCE(purpose_text,'')) LIKE '%cald to cald%'\n    OR LOWER(COALESCE(raw_note,'')) LIKE '%card to card%')\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "1000000",
+      "card"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-03",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "отправители кто делал больше 50 транзакций",
+    "gold_sql": "SELECT payer_name, COUNT(*) AS tx_count, SUM(amount_kzt) AS total_sent\nFROM afm.transactions_nl_view\nWHERE payer_name IS NOT NULL AND amount_kzt IS NOT NULL\nGROUP BY payer_name\nHAVING COUNT(*) > 50\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "HAVING",
+      "COUNT",
+      "50",
+      "payer_name",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-04",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "один отправитель в один день перевел больше миллиона",
+    "gold_sql": "SELECT payer_name, operation_date, SUM(amount_kzt) AS daily_total, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND payer_name IS NOT NULL\nGROUP BY payer_name, operation_date\nHAVING SUM(amount_kzt) > 1000000\nORDER BY daily_total DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "payer_name",
+      "operation_date",
+      "GROUP BY",
+      "HAVING",
+      "1000000"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-05",
+    "difficulty": "medium",
+    "group": "risk",
+    "question": "операции без назначения платежа на сумму больше 500 тысяч",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name\nFROM afm.transactions_nl_view\nWHERE amount_kzt > 500000\n  AND (purpose_text IS NULL OR TRIM(purpose_text) = '')\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "500000",
+      "purpose_text",
+      "NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-06",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "найди пары плательщик получатель с более 10 транзакциями",
+    "gold_sql": "SELECT payer_name, receiver_name, COUNT(*) AS tx_count, SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE payer_name IS NOT NULL AND receiver_name IS NOT NULL AND amount_kzt IS NOT NULL\nGROUP BY payer_name, receiver_name\nHAVING COUNT(*) > 10\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "payer_name",
+      "receiver_name",
+      "GROUP BY",
+      "HAVING",
+      "COUNT",
+      "10"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-07",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "переводы от нерезидентов на сумму больше 500 тысяч",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, payer_residency, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt > 500000\n  AND payer_residency IS NOT NULL\n  AND LOWER(payer_residency) NOT IN ('резидент','казахстан','')\nORDER BY amount_kzt DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "500000",
+      "payer_residency"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-08",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "транзакции где сумма больше среднего по клиенту в 10 раз",
+    "gold_sql": "SELECT tx_id, client_name, operation_date, amount_kzt, purpose_text\nFROM afm.transactions_nl_view t\nWHERE amount_kzt IS NOT NULL\n  AND amount_kzt > 10 * (\n      SELECT AVG(t2.amount_kzt)\n      FROM afm.transactions_nl_view t2\n      WHERE t2.client_name = t.client_name AND t2.amount_kzt IS NOT NULL\n  )\nORDER BY amount_kzt DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "AVG",
+      "client_name",
+      "amount_kzt",
+      "10"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "H-09",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "топ 20 операций по сумме за всё время",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nORDER BY amount_kzt DESC\nLIMIT 20;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "DESC",
+      "LIMIT 20",
+      "IS NOT NULL"
+    ],
+    "check_rows_eq": 20
+  },
+  {
+    "id": "H-10",
+    "difficulty": "hard",
+    "group": "risk",
+    "question": "клиенты у которых одна и та же сумма повторяется больше 5 раз",
+    "gold_sql": "SELECT client_name, amount_kzt, COUNT(*) AS repeat_count\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND client_name IS NOT NULL\nGROUP BY client_name, amount_kzt\nHAVING COUNT(*) > 5\nORDER BY repeat_count DESC\nLIMIT 50;",
+    "check_sql_contains": [
+      "client_name",
+      "amount_kzt",
+      "GROUP BY",
+      "HAVING",
+      "COUNT"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-01",
+    "difficulty": "easy",
+    "group": "quality",
+    "question": "найди транзакции где direction NULL",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, operation_type_raw, payer_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE direction IS NULL\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "direction",
+      "IS NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-02",
+    "difficulty": "easy",
+    "group": "quality",
+    "question": "найди транзакции где сумма в тенге пустая",
+    "gold_sql": "SELECT tx_id, operation_date, currency, payer_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NULL\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "IS NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-03",
+    "difficulty": "easy",
+    "group": "quality",
+    "question": "найди транзакции без назначения платежа",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name\nFROM afm.transactions_nl_view\nWHERE purpose_text IS NULL OR TRIM(purpose_text) = ''\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text",
+      "IS NULL"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-04",
+    "difficulty": "easy",
+    "group": "quality",
+    "question": "найди транзакции с нулевой суммой",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE amount_kzt = 0\nORDER BY operation_date DESC\nLIMIT 100;",
+    "check_sql_contains": [
+      "amount_kzt",
+      "= 0"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-05",
+    "difficulty": "easy",
+    "group": "quality",
+    "question": "сколько транзакций у которых нет даты операции",
+    "gold_sql": "SELECT COUNT(*) AS no_date_count\nFROM afm.transactions_nl_view\nWHERE operation_date IS NULL;",
+    "check_sql_contains": [
+      "operation_date",
+      "IS NULL",
+      "COUNT"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "I-06",
+    "difficulty": "medium",
+    "group": "quality",
+    "question": "найди выписки где нет даты начала периода",
+    "gold_sql": "SELECT DISTINCT client_name, account_iban, source_bank\nFROM afm.transactions_nl_view\nWHERE period_from IS NULL AND client_name IS NOT NULL\nORDER BY client_name;",
+    "check_sql_contains": [
+      "period_from",
+      "IS NULL",
+      "client_name"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "I-07",
+    "difficulty": "medium",
+    "group": "quality",
+    "question": "найди клиентов у которых закрывающий баланс меньше нуля",
+    "gold_sql": "SELECT DISTINCT client_name, account_iban, closing_balance\nFROM afm.transactions_nl_view\nWHERE closing_balance < 0\nORDER BY closing_balance ASC;",
+    "check_sql_contains": [
+      "closing_balance",
+      "< 0",
+      "client_name"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "J-01",
+    "difficulty": "hard",
+    "group": "reconciliation",
+    "question": "для каждого клиента сравни total credit из выписки с суммой транзакций",
+    "gold_sql": "SELECT\n    client_name,\n    MAX(total_credit) AS stated_credit,\n    SUM(CASE WHEN direction = 'credit' OR operation_type_raw ILIKE '%вх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END) AS tx_credit_sum\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY client_name\nORDER BY stated_credit DESC NULLS LAST;",
+    "check_sql_contains": [
+      "client_name",
+      "total_credit",
+      "SUM",
+      "CASE",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "J-02",
+    "difficulty": "hard",
+    "group": "reconciliation",
+    "question": "сравни активность клиентов kaspi и halyk",
+    "gold_sql": "SELECT source_bank,\n    COUNT(DISTINCT client_name) AS client_count,\n    COUNT(*) AS tx_count,\n    SUM(amount_kzt) AS total_amount,\n    AVG(amount_kzt) AS avg_amount\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY source_bank\nORDER BY total_amount DESC;",
+    "check_sql_contains": [
+      "source_bank",
+      "COUNT",
+      "SUM",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 1
+  },
+  {
+    "id": "J-03",
+    "difficulty": "hard",
+    "group": "reconciliation",
+    "question": "покажи клиентов у которых оборот очень большой но остаток маленький",
+    "gold_sql": "SELECT client_name,\n    SUM(amount_kzt) AS total_oborot,\n    MAX(closing_balance) AS closing_balance\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL\nGROUP BY client_name\nHAVING SUM(amount_kzt) > 1000000 AND MAX(closing_balance) < 10000\nORDER BY total_oborot DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "SUM",
+      "closing_balance",
+      "HAVING",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "J-04",
+    "difficulty": "hard",
+    "group": "reconciliation",
+    "question": "для каждого клиента покажи число выписок и число транзакций",
+    "gold_sql": "SELECT client_name,\n    COUNT(DISTINCT account_iban) AS statement_count,\n    COUNT(*) AS tx_count,\n    SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE client_name IS NOT NULL\nGROUP BY client_name\nORDER BY tx_count DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "COUNT",
+      "DISTINCT",
+      "account_iban",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "J-05",
+    "difficulty": "hard",
+    "group": "reconciliation",
+    "question": "найди выписки где totals не совпадают с транзакциями",
+    "gold_sql": "SELECT client_name, account_iban,\n    MAX(total_credit) AS stated_credit,\n    SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END) AS calc_credit,\n    ABS(MAX(total_credit) - SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END)) AS diff\nFROM afm.transactions_nl_view\nWHERE amount_kzt IS NOT NULL AND total_credit IS NOT NULL\nGROUP BY client_name, account_iban\nHAVING ABS(MAX(total_credit) - SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END)) > 100\nORDER BY diff DESC;",
+    "check_sql_contains": [
+      "client_name",
+      "total_credit",
+      "ABS",
+      "HAVING",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "K-01",
+    "difficulty": "medium",
+    "group": "time",
+    "question": "сумма операций по месяцам за 2023 год",
+    "gold_sql": "SELECT DATE_TRUNC('month', operation_date) AS month,\n    COUNT(*) AS tx_count,\n    SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2023-01-01' AND '2023-12-31'\n  AND amount_kzt IS NOT NULL\nGROUP BY DATE_TRUNC('month', operation_date)\nORDER BY month ASC;",
+    "check_sql_contains": [
+      "DATE_TRUNC",
+      "month",
+      "2023",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "K-02",
+    "difficulty": "medium",
+    "group": "time",
+    "question": "сумма операций по месяцам за 2024 год",
+    "gold_sql": "SELECT DATE_TRUNC('month', operation_date) AS month,\n    COUNT(*) AS tx_count,\n    SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE operation_date BETWEEN '2024-01-01' AND '2024-12-31'\n  AND amount_kzt IS NOT NULL\nGROUP BY DATE_TRUNC('month', operation_date)\nORDER BY month ASC;",
+    "check_sql_contains": [
+      "DATE_TRUNC",
+      "month",
+      "2024",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "K-03",
+    "difficulty": "medium",
+    "group": "time",
+    "question": "по месяцам входящий и исходящий оборот",
+    "gold_sql": "SELECT DATE_TRUNC('month', operation_date) AS month,\n    SUM(CASE WHEN direction='credit' OR operation_type_raw ILIKE '%вх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END) AS incoming,\n    SUM(CASE WHEN direction='debit' OR direction IS NULL OR operation_type_raw ILIKE '%исх%'\n             THEN COALESCE(amount_kzt,0) ELSE 0 END) AS outgoing\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL AND amount_kzt IS NOT NULL\nGROUP BY DATE_TRUNC('month', operation_date)\nORDER BY month ASC;",
+    "check_sql_contains": [
+      "DATE_TRUNC",
+      "CASE",
+      "WHEN",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 5
+  },
+  {
+    "id": "K-04",
+    "difficulty": "hard",
+    "group": "time",
+    "question": "найди дни с пиковым числом транзакций",
+    "gold_sql": "SELECT operation_date, COUNT(*) AS tx_count\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL\nGROUP BY operation_date\nORDER BY tx_count DESC\nLIMIT 10;",
+    "check_sql_contains": [
+      "operation_date",
+      "COUNT",
+      "GROUP BY",
+      "ORDER BY",
+      "DESC"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "K-05",
+    "difficulty": "medium",
+    "group": "time",
+    "question": "сколько транзакций было до 2024 года",
+    "gold_sql": "SELECT COUNT(*) AS pre_2024_count\nFROM afm.transactions_nl_view\nWHERE operation_date < '2024-01-01';",
+    "check_sql_contains": [
+      "COUNT",
+      "operation_date",
+      "2024"
+    ],
+    "check_rows_eq": 1
+  },
+  {
+    "id": "K-06",
+    "difficulty": "hard",
+    "group": "time",
+    "question": "динамика среднего чека по кварталам",
+    "gold_sql": "SELECT DATE_TRUNC('quarter', operation_date) AS quarter,\n    COUNT(*) AS tx_count,\n    AVG(amount_kzt) AS avg_amount,\n    SUM(amount_kzt) AS total_amount\nFROM afm.transactions_nl_view\nWHERE operation_date IS NOT NULL AND amount_kzt IS NOT NULL\nGROUP BY DATE_TRUNC('quarter', operation_date)\nORDER BY quarter ASC;",
+    "check_sql_contains": [
+      "DATE_TRUNC",
+      "quarter",
+      "AVG",
+      "GROUP BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-01",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на оплату медицинских услуг",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding",
+      "ORDER BY"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-02",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на выплату зарплаты",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-03",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на налоговые платежи",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-04",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на аренду",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-05",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на финансовую пирамиду",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-06",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "переводы между своими счетами",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nWHERE LOWER(COALESCE(purpose_text,'')) LIKE '%собственн%'\n   OR LOWER(COALESCE(purpose_text,'')) LIKE '%перевод%счет%'\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "purpose_text"
+    ],
+    "check_rows_gt": 0
+  },
+  {
+    "id": "L-07",
+    "difficulty": "medium",
+    "group": "semantic",
+    "question": "транзакции похожие на обналичивание",
+    "gold_sql": "SELECT tx_id, operation_date, amount_kzt, payer_name, receiver_name, purpose_text\nFROM afm.transactions_nl_view\nORDER BY semantic_embedding <-> :query_embedding\nLIMIT 100;",
+    "check_sql_contains": [
+      "semantic_embedding",
+      "query_embedding"
+    ],
+    "check_rows_gt": 0
+  }
+]
