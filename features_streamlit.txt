@@ -1,0 +1,19 @@
+Current Streamlit app features before wipe
+4) NL2SQL pipeline behavior
+- Extracts entities, retrieves context, builds prompt, generates SQL, validates SQL, executes SQL.
+- Retry and repair loop with attempt history.
+- Query quality modes: Strict / Balanced / Broad semantic (different retrieval behavior).
+- Max rows and retry budget controls from sidebar.
+
+8) Prompt library and run log
+- Prompt library panel with add prompt popover, favorite toggle, delete, run action.
+- Mini toggle buttons to show/hide Prompt Library and Run Log sections.
+- Run Log displays session query history table and allows CSV download.
+
+
+
+
+
+Ok, I am thinking when user requests stuff like "Транзакции, связанные с недвижимостью" It gives response as needed that is clear, but what do u think what should we do if user sends request like "Hello"? Do u think to make it more like natural we should add new conditional to check whether it requeires to generate SQL or not, if it does require then it will continue, it it doesnt require then it will just pick other route/flow(in case if we add other features) and just generate answer to user
+Yeah, i would need intent classifier for non sql requests like asking sth or just chatting.
+Can u build it and also add params to env file. If u have question ask
