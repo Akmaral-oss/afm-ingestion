@@ -5,55 +5,52 @@ import os
 import random
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Transaction, User
+from .project_context import ensure_user_active_project
 from .security import hash_password
 
-# ---------------------------------------------------------------------------
-# Realistic Kazakh company / individual data
-# ---------------------------------------------------------------------------
-
 COMPANIES = [
-    ("ТОО \"Алма Трейд\"", "780425301298", "KZ12345678901234"),
-    ("АО \"КазЭнерго\"", "041240001234", "KZ55512340067890"),
-    ("ИП Иванов А.С.", "910312450178", "KZ98765432109876"),
-    ("ТОО \"Астана Строй\"", "050640009876", "KZ22233344455566"),
-    ("ИП Сергеев К.М.", "860715302456", "KZ11122233344455"),
-    ("АО \"Казахтелеком\"", "970140005678", "KZ66677788899900"),
-    ("ТОО \"Нур Фарм\"", "120840003456", "KZ33344455566677"),
-    ("ИП Назарбаева М.К.", "880920301567", "KZ44455566677788"),
-    ("ТОО \"ТрансЛогистик\"", "030340007890", "KZ77788899900011"),
-    ("АО \"Самрук-Энерго\"", "060540002345", "KZ88899900011122"),
-    ("ТОО \"Медсервис Плюс\"", "100240004567", "KZ99900011122233"),
-    ("ИП Ким В.А.", "830610301890", "KZ00011122233344"),
-    ("ТОО \"АгроПром\"", "071140006789", "KZ11100022233344"),
-    ("АО \"Kaspi Bank\"", "980240001111", "KZ55500011122233"),
-    ("ТОО \"Цифровые Решения\"", "150940002222", "KZ66600011122233"),
+    ("РўРћРћ \"РђР»РјР° РўСЂРµР№Рґ\"", "780425301298", "KZ12345678901234"),
+    ("РђРћ \"РљР°Р·Р­РЅРµСЂРіРѕ\"", "041240001234", "KZ55512340067890"),
+    ("РРџ РРІР°РЅРѕРІ Рђ.РЎ.", "910312450178", "KZ98765432109876"),
+    ("РўРћРћ \"РђСЃС‚Р°РЅР° РЎС‚СЂРѕР№\"", "050640009876", "KZ22233344455566"),
+    ("РРџ РЎРµСЂРіРµРµРІ РљРњ.", "860715302456", "KZ11122233344455"),
+    ("РђРћ \"РљР°Р·Р°С…С‚РµР»РµРєРѕРј\"", "970140005678", "KZ66677788899900"),
+    ("РўРћРћ \"РќСѓСЂ Р¤Р°СЂРј\"", "120840003456", "KZ33344455566677"),
+    ("РРџ РќР°Р·Р°СЂР±Р°РµРІР° Рњ.Рљ.", "880920301567", "KZ44455566677788"),
+    ("РўРћРћ \"РўСЂР°РЅСЃР›РѕРіРёСЃС‚РёРє\"", "030340007890", "KZ77788899900011"),
+    ("РђРћ \"РЎР°РјСЂСѓРє-Р­РЅРµСЂРіРѕ\"", "060540002345", "KZ88899900011122"),
+    ("РўРћРћ \"РњРµРґСЃРµСЂРІРёСЃ РџР»СЋСЃ\"", "100240004567", "KZ99900011122233"),
+    ("РРџ РљРёРј Р’.Рђ.", "830610301890", "KZ00011122233344"),
+    ("РўРћРћ \"РђРіСЂРѕРџСЂРѕРј\"", "071140006789", "KZ11100022233344"),
+    ("РђРћ \"Kaspi Bank\"", "980240001111", "KZ55500011122233"),
+    ("РўРћРћ \"Р¦РёС„СЂРѕРІС‹Рµ Р РµС€РµРЅРёСЏ\"", "150940002222", "KZ66600011122233"),
 ]
 
 PURPOSES = [
-    "Оплата за поставку канцелярских товаров по счету №{inv} от {d}",
-    "Возврат переплаты по договору электроснабжения №{inv}-Э",
-    "Оплата по договору аренды офиса за {month} {year} г.",
-    "Перечисление за транспортные услуги, акт №{inv}",
-    "Оплата за медицинские услуги, счет №{inv} от {d}",
-    "Оплата за телекоммуникационные услуги за {month} {year} г.",
-    "Возврат средств по рекламации №{inv}",
-    "Оплата за строительные материалы, накладная №{inv}",
-    "Перечисление по договору поставки №{inv} от {d}",
-    "Оплата за IT-услуги (поддержка), акт №{inv} от {d}",
-    "Оплата за фармацевтическую продукцию, счет №{inv}",
-    "Возврат залога по договору аренды №{inv}",
-    "Оплата за логистические услуги, ТТН №{inv}",
-    "Перечисление зарплаты сотрудникам за {month} {year} г.",
-    "Оплата за сельскохозяйственную продукцию, договор №{inv}",
+    "РћРїР»Р°С‚Р° Р·Р° РїРѕСЃС‚Р°РІРєСѓ РєР°РЅС†РµР»СЏСЂСЃРєРёС… С‚РѕРІР°СЂРѕРІ РїРѕ СЃС‡РµС‚Сѓ в„–{inv} РѕС‚ {d}",
+    "Р’РѕР·РІСЂР°С‚ РїРµСЂРµРїР»Р°С‚С‹ РїРѕ РґРѕРіРѕРІРѕСЂСѓ СЌР»РµРєС‚СЂРѕСЃРЅР°Р±Р¶РµРЅРёСЏ в„–{inv}-Р­",
+    "РћРїР»Р°С‚Р° РїРѕ РґРѕРіРѕРІРѕСЂСѓ Р°СЂРµРЅРґС‹ РѕС„РёСЃР° Р·Р° {month} {year} Рі.",
+    "РџРµСЂРµС‡РёСЃР»РµРЅРёРµ Р·Р° С‚СЂР°РЅСЃРїРѕСЂС‚РЅС‹Рµ СѓСЃР»СѓРіРё, Р°РєС‚ в„–{inv}",
+    "РћРїР»Р°С‚Р° Р·Р° РјРµРґРёС†РёРЅСЃРєРёРµ СѓСЃР»СѓРіРё, СЃС‡РµС‚ в„–{inv} РѕС‚ {d}",
+    "РћРїР»Р°С‚Р° Р·Р° С‚РµР»РµРєРѕРјРјСѓРЅРёРєР°С†РёРѕРЅРЅС‹Рµ СѓСЃР»СѓРіРё Р·Р° {month} {year} Рі.",
+    "Р’РѕР·РІСЂР°С‚ СЃСЂРµРґСЃС‚РІ РїРѕ РЅРµРєР°С‡РµСЃС‚РІРµРЅРЅРѕРјСѓ С‚РѕРІР°СЂСѓ в„–{inv}",
+    "РћРїР»Р°С‚Р° Р·Р° СЃС‚СЂРѕРёС‚РµР»СЊРЅС‹Рµ РјР°С‚РµСЂРёР°Р»С‹, РЅР°РєР»Р°РґРЅР°СЏ в„–{inv}",
+    "РџРµСЂРµС‡РёСЃР»РµРЅРёРµ РїРѕ РґРѕРіРѕРІРѕСЂСѓ РїРѕСЃС‚Р°РІРєРё в„–{inv} РѕС‚ {d}",
+    "РћРїР»Р°С‚Р° Р·Р° IT-СѓСЃР»СѓРіРё (РїРѕРґРґРµСЂР¶РєР°), Р°РєС‚ в„–{inv} РѕС‚ {d}",
+    "РћРїР»Р°С‚Р° Р·Р° С„Р°СЂРјР°С†РµРІС‚РёС‡РµСЃРєСѓСЋ РїСЂРѕРґСѓРєС†РёСЋ, СЃС‡РµС‚ в„–{inv}",
+    "Р’РѕР·РІСЂР°С‚ Р·Р°Р»РѕРіР° РїРѕ РґРѕРіРѕРІРѕСЂСѓ Р°СЂРµРЅРґС‹ в„–{inv}",
+    "РћРїР»Р°С‚Р° Р·Р° Р»РѕРіРёСЃС‚РёС‡РµСЃРєРёРµ СѓСЃР»СѓРіРё, РўРўРќ в„–{inv}",
+    "РџРµСЂРµС‡РёСЃР»РµРЅРёРµ Р·Р°СЂРїР»Р°С‚С‹ СЃРѕС‚СЂСѓРґРЅРёРєР°Рј Р·Р° {month} {year} Рі.",
+    "РћРїР»Р°С‚Р° Р·Р° СЃРµР»СЊСЃРєРѕС…РѕР·СЏР№СЃС‚РІРµРЅРЅСѓСЋ РїСЂРѕРґСѓРєС†РёСЋ, РґРѕРіРѕРІРѕСЂ в„–{inv}",
 ]
 
 MONTHS_RU = [
-    "январь", "февраль", "март", "апрель", "май", "июнь",
-    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+    "СЏРЅРІР°СЂСЊ", "С„РµРІСЂР°Р»СЊ", "РјР°СЂС‚", "Р°РїСЂРµР»СЊ", "РјР°Р№", "РёСЋРЅСЊ",
+    "РёСЋР»СЊ", "Р°РІРіСѓСЃС‚", "СЃРµРЅС‚СЏР±СЂСЊ", "РѕРєС‚СЏР±СЂСЊ", "РЅРѕСЏР±СЂСЊ", "РґРµРєР°Р±СЂСЊ",
 ]
 
 CURRENCIES = ["KZT", "KZT", "KZT", "KZT", "KZT", "USD", "EUR", "RUB"]
@@ -70,7 +67,6 @@ def _random_purpose(dt: datetime) -> str:
 
 
 def _generate_transactions(count: int) -> list[dict]:
-    """Generate `count` random transaction dicts."""
     transactions = []
     start_date = datetime(2026, 1, 4)
     end_date = datetime(2026, 2, 12)
@@ -78,7 +74,6 @@ def _generate_transactions(count: int) -> list[dict]:
 
     for _ in range(count):
         dt = start_date + timedelta(seconds=random.randint(0, int(delta)))
-        # Ensure business hours (8:00 - 18:00)
         dt = dt.replace(hour=random.randint(8, 17), minute=random.randint(0, 59))
 
         sender = random.choice(COMPANIES)
@@ -96,7 +91,7 @@ def _generate_transactions(count: int) -> list[dict]:
         elif currency == "EUR":
             amount = round(random.uniform(100, 10_000), 2)
             amount_tenge = round(amount * 520.30, 2)
-        else:  # RUB
+        else:
             amount = round(random.uniform(10_000, 500_000), 2)
             amount_tenge = round(amount * 5.20, 2)
 
@@ -117,26 +112,32 @@ def _generate_transactions(count: int) -> list[dict]:
             }
         )
 
-    # Sort by date
     transactions.sort(key=lambda t: t["date"])
     return transactions
 
-async def seed_admin_if_missing(session):
+
+async def seed_admin_if_missing(session: AsyncSession):
     admin_email = os.getenv("ADMIN_EMAIL", "myadmin@local")
     admin_password = os.getenv("ADMIN_PASSWORD", "123123")
     res = await session.execute(select(User).where(User.email == admin_email))
-    if res.scalar_one_or_none():
+    existing = res.scalar_one_or_none()
+    if existing:
+        await ensure_user_active_project(session, existing)
+        await session.commit()
         return
 
-    session.add(User(
+    user = User(
         email=admin_email,
         password_hash=hash_password(admin_password),
-        role="admin"
-    ))
+        role="admin",
+    )
+    session.add(user)
+    await session.flush()
+    await ensure_user_active_project(session, user)
     await session.commit()
 
+
 async def seed_if_empty(session: AsyncSession, count: int = 200) -> None:
-    """Check if the transactions table is empty; if so, populate it."""
     await seed_admin_if_missing(session)
 
     result = await session.execute(select(func.count(Transaction.id)))
@@ -144,9 +145,14 @@ async def seed_if_empty(session: AsyncSession, count: int = 200) -> None:
     if existing and existing > 0:
         return
 
+    admin_email = os.getenv("ADMIN_EMAIL", "myadmin@local")
+    admin = (await session.execute(select(User).where(User.email == admin_email))).scalar_one()
+    project = await ensure_user_active_project(session, admin)
+
     print(f"[seed] Database is empty — generating {count} transactions …")
     rows = _generate_transactions(count)
     for row in rows:
+        row["project_id"] = project.project_id
         session.add(Transaction(**row))
     await session.commit()
     print(f"[seed] Inserted {count} transactions.")

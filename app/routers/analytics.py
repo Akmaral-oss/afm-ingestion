@@ -9,12 +9,13 @@ Analytics endpoints:
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, or_, case, literal, literal_column, cast, DateTime, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Transaction
+from ..project_context import ProjectContext, get_current_project_context
 from app.exceptions import MissingIdentityFieldsException
 from ..schemas import (
     TimeSeriesResponse,
@@ -78,12 +79,14 @@ def _fix_mojibake(value: Optional[str]) -> str:
 
 
 def _derived_category_expr():
-    trimmed_category = func.nullif(func.trim(Transaction.category), "")
+    trimmed_category = func.nullif(func.trim(Transaction.transaction_category), "")
+    trimmed_legacy_category = func.nullif(func.trim(Transaction.category), "")
     purpose = func.lower(func.coalesce(Transaction.purpose, ""))
     op_type = func.lower(func.coalesce(Transaction.operation_type, ""))
     direction = func.lower(func.coalesce(Transaction.direction, ""))
     return func.coalesce(
         trimmed_category,
+        trimmed_legacy_category,
         case(
             (or_(purpose.like("%red.kz%"), purpose.like("%продаж%")), "Продажи Kaspi / Red"),
             (or_(purpose.like("%погаш%"), purpose.like("%кредит%")), "Погашение кредита"),
@@ -190,6 +193,10 @@ def _format_tx_dt(tx: Transaction) -> str:
     return dt.strftime("%d.%m.%Y %H:%M") if dt else ""
 
 
+def _project_where(project_id: str, *conds):
+    return and_(Transaction.project_id == project_id, *conds)
+
+
 def _cash_withdrawal_condition():
     purpose = func.lower(func.coalesce(Transaction.purpose, ""))
     category = func.lower(func.coalesce(Transaction.category, ""))
@@ -261,10 +268,11 @@ async def time_series(
     period: str = Query("month", description="year | month | day"),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     conds = _date_range_conditions(date_from, date_to)
-    where = and_(*conds) if conds else True
+    where = _project_where(ctx.project.project_id, *conds)
 
     # Group expression depends on period
     effective_dt = _effective_dt_expr()
@@ -319,6 +327,7 @@ async def time_series_transactions(
     period: str = Query("month", description="year | month | day"),
     bucket: str = Query(..., description="YYYY | YYYY-MM | YYYY-MM-DD"),
     limit: int = Query(200, ge=1, le=500),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     effective_dt = _effective_dt_expr()
@@ -329,12 +338,14 @@ async def time_series_transactions(
     else:
         cond = (func.to_char(effective_dt, "YYYY-MM") == bucket)
 
-    total_q = select(func.count(Transaction.id)).where(cond)
+    where = _project_where(ctx.project.project_id, cond)
+
+    total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
 
     rows_q = (
         select(Transaction)
-        .where(cond)
+        .where(where)
         .order_by(effective_dt.desc(), Transaction.id.desc())
         .limit(limit)
     )
@@ -371,10 +382,11 @@ async def time_series_transactions(
 async def analytics_summary(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     conds = _date_range_conditions(date_from, date_to)
-    where = and_(*conds) if conds else True
+    where = _project_where(ctx.project.project_id, *conds)
 
     q = select(
         func.coalesce(func.sum(Transaction.credit), 0).label("total_credit"),
@@ -408,6 +420,7 @@ async def analytics_summary(
 async def top_expenses(
     type: str = Query("debit", description="debit | credit"),
     limit: int = Query(10, ge=1, le=100),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     if type == "credit":
@@ -431,7 +444,7 @@ async def top_expenses(
             func.sum(amount_col).label("amount"),
             func.count(Transaction.id).label("tx_count"),
         )
-        .where(and_(amount_col > 0, valid_display))
+        .where(_project_where(ctx.project.project_id, amount_col > 0, valid_display))
         .group_by(display_name, group_iin, group_acc)
         .order_by(func.sum(amount_col).desc())
         .limit(limit)
@@ -440,7 +453,9 @@ async def top_expenses(
     rows = (await db.execute(q)).all()
 
     # grand total for percentage
-    total_q = select(func.coalesce(func.sum(amount_col), 0)).where(and_(amount_col > 0, valid_display))
+    total_q = select(func.coalesce(func.sum(amount_col), 0)).where(
+        _project_where(ctx.project.project_id, amount_col > 0, valid_display)
+    )
     grand_total = float((await db.execute(total_q)).scalar() or 0)
 
     merged: dict[str, dict] = {}
@@ -485,6 +500,7 @@ async def top_expenses_transactions(
     account: Optional[str] = Query(None),
     name: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=500),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     norm_iin = _normalize_iin(iin_bin or "")
@@ -512,7 +528,7 @@ async def top_expenses_transactions(
     else:
         cp_cond = (_display_name_expr(cp_name_col, cp_acc_col) == cp_name)
 
-    where = and_(amount_col > 0, cp_cond)
+    where = _project_where(ctx.project.project_id, amount_col > 0, cp_cond)
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
 
@@ -560,6 +576,7 @@ async def top_expenses_transactions(
 @router.get("/top-counterparties", response_model=TopCounterpartiesResponse)
 async def top_counterparties(
     limit: int = Query(10, ge=1, le=100),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     sender_display = _display_name_expr(Transaction.sender_name, Transaction.sender_account)
@@ -600,7 +617,8 @@ async def top_counterparties(
             func.count(Transaction.id).label("transaction_count"),
         )
         .where(
-            and_(
+            _project_where(
+                ctx.project.project_id,
                 sender_display.isnot(None),
                 sender_display != "",
                 or_(sender_has_iin, sender_has_acc),
@@ -621,7 +639,8 @@ async def top_counterparties(
             func.count(Transaction.id).label("transaction_count"),
         )
         .where(
-            and_(
+            _project_where(
+                ctx.project.project_id,
                 recipient_display.isnot(None),
                 recipient_display != "",
                 or_(recipient_has_iin, recipient_has_acc),
@@ -672,6 +691,7 @@ async def top_counterparties(
 async def counterparty_search(
     q: str = Query(..., min_length=2, description="Partial counterparty name, IIN/BIN or account"),
     limit: int = Query(8, ge=1, le=50),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     query_text = (q or "").strip()
@@ -725,7 +745,8 @@ async def counterparty_search(
             func.count(Transaction.id).label("transaction_count"),
         )
         .where(
-            and_(
+            _project_where(
+                ctx.project.project_id,
                 sender_display.isnot(None),
                 sender_display != "",
                 or_(sender_has_iin, sender_has_acc),
@@ -745,7 +766,8 @@ async def counterparty_search(
             func.count(Transaction.id).label("transaction_count"),
         )
         .where(
-            and_(
+            _project_where(
+                ctx.project.project_id,
                 recipient_display.isnot(None),
                 recipient_display != "",
                 or_(recipient_has_iin, recipient_has_acc),
@@ -793,6 +815,7 @@ async def counterparty_search(
 @router.get("/category-summary", response_model=CategorySummaryResponse)
 async def category_summary(
     limit: int = Query(24, ge=1, le=100),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     category_expr = _derived_category_expr()
@@ -804,7 +827,7 @@ async def category_summary(
             func.coalesce(func.sum(Transaction.debit), 0).label("total_debit"),
             func.coalesce(func.sum(Transaction.credit), 0).label("total_credit"),
         )
-        .where(category_expr.isnot(None))
+        .where(_project_where(ctx.project.project_id, category_expr.isnot(None)))
         .group_by(category_expr)
         .order_by(func.count(Transaction.id).desc(), func.sum(Transaction.amount_tenge).desc())
         .limit(limit)
@@ -833,6 +856,7 @@ async def category_summary(
 async def cash_top(
     type: str = Query("withdrawal", description="withdrawal | deposit"),
     limit: int = Query(10, ge=1, le=100),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     if type == "deposit":
@@ -850,7 +874,7 @@ async def cash_top(
 
     display_name = _display_name_expr(group_name, group_acc)
     valid_display = and_(display_name.isnot(None), display_name != "")
-    base_cond = and_(amount_col > 0, purpose_cond, valid_display)
+    base_cond = _project_where(ctx.project.project_id, amount_col > 0, purpose_cond, valid_display)
 
     q = (
         select(
@@ -921,6 +945,7 @@ async def cash_transactions(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
     account: Optional[str] = Query(None, description="Counterparty account"),
     limit: int = Query(100, ge=1, le=500),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     if type == "deposit":
@@ -942,7 +967,7 @@ async def cash_transactions(
             cp_cond = and_(cp_cond, cp_acc_col == account)
         purpose_cond = _cash_withdrawal_condition()
 
-    where = and_(amount_col > 0, purpose_cond, cp_cond)
+    where = _project_where(ctx.project.project_id, amount_col > 0, purpose_cond, cp_cond)
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
@@ -970,7 +995,9 @@ async def cash_transactions(
         for t in rows
     ]
 
-    cp_name_q = select(cp_name_col, cp_acc_col).where(cp_iin_col == iin_bin).limit(1)
+    cp_name_q = select(cp_name_col, cp_acc_col).where(
+        _project_where(ctx.project.project_id, cp_iin_col == iin_bin)
+    ).limit(1)
     cp_name_row = (await db.execute(cp_name_q)).first()
     cp_name = _resolve_display_name(
         cp_name_row[0] if cp_name_row else None,
@@ -991,20 +1018,22 @@ async def counterparty_transactions(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
     account: Optional[str] = Query(None, description="Counterparty account"),
     limit: int = Query(200, ge=1, le=500),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
-    where = or_(
+    identity_cond = or_(
         Transaction.sender_iin_bin == iin_bin,
         Transaction.recipient_iin_bin == iin_bin,
     )
     if account:
-        where = and_(
-            where,
+        identity_cond = and_(
+            identity_cond,
             or_(
                 Transaction.sender_account == account,
                 Transaction.recipient_account == account,
             ),
         )
+    where = _project_where(ctx.project.project_id, identity_cond)
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
@@ -1032,14 +1061,18 @@ async def counterparty_transactions(
         for t in rows
     ]
 
-    cp_name_q = select(Transaction.sender_name, Transaction.sender_account).where(Transaction.sender_iin_bin == iin_bin).limit(1)
+    cp_name_q = select(Transaction.sender_name, Transaction.sender_account).where(
+        _project_where(ctx.project.project_id, Transaction.sender_iin_bin == iin_bin)
+    ).limit(1)
     cp_name_row = (await db.execute(cp_name_q)).first()
     cp_name = _resolve_display_name(
         cp_name_row[0] if cp_name_row else None,
         cp_name_row[1] if cp_name_row else account,
     )
     if not cp_name:
-        cp_name_q = select(Transaction.recipient_name, Transaction.recipient_account).where(Transaction.recipient_iin_bin == iin_bin).limit(1)
+        cp_name_q = select(Transaction.recipient_name, Transaction.recipient_account).where(
+            _project_where(ctx.project.project_id, Transaction.recipient_iin_bin == iin_bin)
+        ).limit(1)
         cp_name_row = (await db.execute(cp_name_q)).first()
         cp_name = _resolve_display_name(
             cp_name_row[0] if cp_name_row else None,
@@ -1058,6 +1091,7 @@ async def edge_transactions(
     source_iin_bin: str = Query(..., description="Source node IIN/BIN"),
     target_iin_bin: str = Query(..., description="Target node IIN/BIN"),
     limit: int = Query(200, ge=1, le=1000),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     source_iin_bin = _normalize_iin(source_iin_bin)
@@ -1066,7 +1100,7 @@ async def edge_transactions(
     if not source_iin_bin or not target_iin_bin:
         raise HTTPException(status_code=422, detail="source_iin_bin and target_iin_bin are required")
 
-    where = or_(
+    pair_cond = or_(
         and_(
             Transaction.sender_iin_bin == source_iin_bin,
             Transaction.recipient_iin_bin == target_iin_bin,
@@ -1076,6 +1110,7 @@ async def edge_transactions(
             Transaction.recipient_iin_bin == source_iin_bin,
         ),
     )
+    where = _project_where(ctx.project.project_id, pair_cond)
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
@@ -1117,7 +1152,7 @@ async def edge_transactions(
         source_row = (
             await db.execute(
                 select(Transaction.sender_name, Transaction.sender_account)
-                .where(Transaction.sender_iin_bin == source_iin_bin)
+                .where(_project_where(ctx.project.project_id, Transaction.sender_iin_bin == source_iin_bin))
                 .limit(1)
             )
         ).first()
@@ -1130,7 +1165,7 @@ async def edge_transactions(
         target_row = (
             await db.execute(
                 select(Transaction.recipient_name, Transaction.recipient_account)
-                .where(Transaction.recipient_iin_bin == target_iin_bin)
+                .where(_project_where(ctx.project.project_id, Transaction.recipient_iin_bin == target_iin_bin))
                 .limit(1)
             )
         ).first()
@@ -1168,6 +1203,7 @@ async def counterparty_graph(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
     depth: str = Query("2", description="Depth level or 'max'"),
     max_neighbors: str = Query("6", description="Max neighbors per node or 'max'"),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     depth_limit = _parse_graph_limit(depth, name="depth", min_value=1)
@@ -1193,7 +1229,7 @@ async def counterparty_graph(
                     func.coalesce(func.sum(Transaction.amount_tenge), 0).label("amount"),
                     func.count(Transaction.id).label("tx_count"),
                 )
-                .where(Transaction.recipient_iin_bin == current)
+                .where(_project_where(ctx.project.project_id, Transaction.recipient_iin_bin == current))
                 .group_by(Transaction.sender_iin_bin, Transaction.sender_name, Transaction.sender_account)
             )
             out_q = (
@@ -1204,7 +1240,7 @@ async def counterparty_graph(
                     func.coalesce(func.sum(Transaction.amount_tenge), 0).label("amount"),
                     func.count(Transaction.id).label("tx_count"),
                 )
-                .where(Transaction.sender_iin_bin == current)
+                .where(_project_where(ctx.project.project_id, Transaction.sender_iin_bin == current))
                 .group_by(Transaction.recipient_iin_bin, Transaction.recipient_name, Transaction.recipient_account)
             )
 
@@ -1263,14 +1299,18 @@ async def counterparty_graph(
         frontier = next_frontier
         level += 1
 
-    center_name_q = select(Transaction.sender_name, Transaction.sender_account).where(Transaction.sender_iin_bin == iin_bin).limit(1)
+    center_name_q = select(Transaction.sender_name, Transaction.sender_account).where(
+        _project_where(ctx.project.project_id, Transaction.sender_iin_bin == iin_bin)
+    ).limit(1)
     center_row = (await db.execute(center_name_q)).first()
     center_name = _resolve_display_name(
         center_row[0] if center_row else None,
         center_row[1] if center_row else None,
     )
     if not center_name:
-        center_name_q = select(Transaction.recipient_name, Transaction.recipient_account).where(Transaction.recipient_iin_bin == iin_bin).limit(1)
+        center_name_q = select(Transaction.recipient_name, Transaction.recipient_account).where(
+            _project_where(ctx.project.project_id, Transaction.recipient_iin_bin == iin_bin)
+        ).limit(1)
         center_row = (await db.execute(center_name_q)).first()
         center_name = _resolve_display_name(
             center_row[0] if center_row else None,

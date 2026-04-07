@@ -13,18 +13,26 @@ class PostgresWriter:
         self.engine = engine
         self.parser_version = parser_version
 
-    def insert_raw_file(self, file_id: str, source_bank: str, filename: str, sha256: str) -> None:
+    def insert_raw_file(
+        self,
+        file_id: str,
+        source_bank: str,
+        filename: str,
+        sha256: str,
+        project_id: str | None = None,
+    ) -> None:
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     """
-                    INSERT INTO afm.raw_files(file_id, source_bank, original_filename, sha256, parser_version)
-                    VALUES (CAST(:file_id AS uuid), :source_bank, :filename, :sha256, :parser_version)
+                    INSERT INTO afm.raw_files(file_id, project_id, source_bank, original_filename, sha256, parser_version)
+                    VALUES (CAST(:file_id AS uuid), CAST(:project_id AS uuid), :source_bank, :filename, :sha256, :parser_version)
                     ON CONFLICT (file_id) DO NOTHING;
                     """
                 ),
                 {
                     "file_id": file_id,
+                    "project_id": project_id,
                     "source_bank": source_bank,
                     "filename": filename,
                     "sha256": sha256,
@@ -115,7 +123,7 @@ class PostgresWriter:
                 text(
                     """
                     INSERT INTO afm.statements(
-                      statement_id, file_id, source_bank, source_sheet, source_block_id, format_id,
+                      statement_id, file_id, project_id, source_bank, source_sheet, source_block_id, format_id,
                       client_name, client_iin_bin, account_iban, account_type, currency,
                       statement_date, period_from, period_to,
                       opening_balance, closing_balance, total_debit, total_credit,
@@ -124,6 +132,7 @@ class PostgresWriter:
                     VALUES (
                       CAST(:statement_id AS uuid),
                       CAST(:file_id AS uuid),
+                      CAST(:project_id AS uuid),
                       :source_bank, :source_sheet, :source_block_id,
                       CAST(:format_id AS uuid),
                       :client_name, :client_iin_bin, :account_iban, :account_type, :currency,
@@ -145,7 +154,7 @@ class PostgresWriter:
         sql = f"""
         INSERT INTO afm.transactions_core ({', '.join(cols)})
         VALUES ({', '.join([f':{c}' for c in cols])})
-        ON CONFLICT (row_hash) DO NOTHING;
+        ON CONFLICT (project_id, row_hash) DO NOTHING;
         """
 
         with self.engine.begin() as conn:

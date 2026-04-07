@@ -20,13 +20,14 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, Query, File, UploadFile, Header, HTTPException, status, Form
 from fastapi.responses import StreamingResponse
 from openpyxl import load_workbook, Workbook
-from sqlalchemy import select, func, and_, or_, case
+from sqlalchemy import select, func, and_, or_, case, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db, async_session, async_engine
 from ..ingestion.pipeline import IngestionPipeline
 from ..models import Transaction, TransactionUploadMeta
+from ..project_context import ProjectContext, get_current_project_context
 from ..schemas import (
     TransactionListResponse,
     TransactionOut,
@@ -167,7 +168,17 @@ def _fix_mojibake(value: object) -> str:
     return s
 
 
-def _derive_display_category(category: str, purpose_text: str, operation_type_raw: str, direction: str = "") -> str:
+def _derive_display_category(
+    category: str,
+    purpose_text: str,
+    operation_type_raw: str,
+    direction: str = "",
+    *,
+    transaction_category: str = "",
+) -> str:
+    base = _fix_mojibake(transaction_category or "").strip()
+    if base:
+        return base
     base = _fix_mojibake(category or "").strip()
     if base:
         return base
@@ -175,12 +186,14 @@ def _derive_display_category(category: str, purpose_text: str, operation_type_ra
 
 
 def _derived_category_expr():
-    trimmed_category = func.nullif(func.trim(Transaction.category), "")
+    trimmed_category = func.nullif(func.trim(Transaction.transaction_category), "")
+    trimmed_legacy_category = func.nullif(func.trim(Transaction.category), "")
     purpose = func.lower(func.coalesce(Transaction.purpose, ""))
     op_type = func.lower(func.coalesce(Transaction.operation_type, ""))
     direction = func.lower(func.coalesce(Transaction.direction, ""))
     return func.coalesce(
         trimmed_category,
+        trimmed_legacy_category,
         case(
             (or_(purpose.like("%red.kz%"), purpose.like("%продаж%")), "Продажи Kaspi / Red"),
             (or_(purpose.like("%погаш%"), purpose.like("%кредит%")), "Погашение кредита"),
@@ -512,6 +525,7 @@ def _build_core_transaction_payload(
     tx: dict,
     *,
     uploader_email: str,
+    project_id: Optional[str],
     source_bank: str,
     source_sheet: str,
     source_row_no: int,
@@ -554,6 +568,7 @@ def _build_core_transaction_payload(
         "file_id": file_id,
         "statement_id": statement_id,
         "format_id": format_id,
+        "project_id": project_id,
         "source_bank": source_bank,
         "source_sheet": (source_sheet or "")[:255] or None,
         "source_block_id": source_block_id,
@@ -834,12 +849,12 @@ def _parser_type_to_source_bank(parser_type: str) -> Optional[str]:
     )
 
 
-def _run_ingestion_pipeline(file_path: str, source_bank: Optional[str]):
+def _run_ingestion_pipeline(file_path: str, source_bank: Optional[str], project_id: Optional[str]):
     with IngestionPipeline() as pipeline:
-        return pipeline.ingest_file(file_path, source_bank=source_bank)
+        return pipeline.ingest_file(file_path, source_bank=source_bank, project_id=project_id)
 
 
-async def _finalize_ingestion_import(file_id: Optional[str], uploader_email: str) -> int:
+async def _finalize_ingestion_import(file_id: Optional[str], uploader_email: str, project_id: Optional[str]) -> int:
     if not file_id:
         return 0
 
@@ -847,7 +862,10 @@ async def _finalize_ingestion_import(file_id: Optional[str], uploader_email: str
         uploaded_tx_ids = list(
             (
                 await session.execute(
-                    select(Transaction.id).where(Transaction.file_id == file_id)
+                    select(Transaction.id).where(
+                        Transaction.file_id == file_id,
+                        Transaction.project_id == project_id,
+                    )
                 )
             ).scalars()
         )
@@ -868,6 +886,7 @@ async def _finalize_ingestion_import(file_id: Optional[str], uploader_email: str
             session.add(
                 TransactionUploadMeta(
                     tx_id=tx_id,
+                    project_id=project_id,
                     uploaded_by_email=uploader_email or "",
                     created_at=datetime.utcnow(),
                 )
@@ -909,6 +928,7 @@ def _meaningful_transaction_condition():
 
 
 def _build_transaction_where_clause(
+    project_id: str,
     date: Optional[str],
     category: Optional[str],
     search: Optional[str],
@@ -918,7 +938,10 @@ def _build_transaction_where_clause(
     sender: Optional[str],
     recipient: Optional[str],
 ):
-    conditions = [_meaningful_transaction_condition()]
+    conditions = [
+        Transaction.project_id == project_id,
+        _meaningful_transaction_condition(),
+    ]
     if date:
         dt = _parse_date(date)
         day_start = dt.replace(hour=0, minute=0, second=0)
@@ -1042,10 +1065,12 @@ async def list_transactions(
     sort_dir: str = Query("desc"),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=500),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     order_by = _build_transaction_order_by(sort_by, sort_dir)
     where_clause = _build_transaction_where_clause(
+        project_id=ctx.project.project_id,
         date=date,
         category=category,
         search=search,
@@ -1092,7 +1117,13 @@ async def list_transactions(
                 iin_bin=t.recipient_iin_bin or "",
                 account=t.recipient_account or "",
             ),
-            category=_derive_display_category(t.category or "", t.purpose or "", t.operation_type or "", t.direction or ""),
+            category=_derive_display_category(
+                t.category or "",
+                t.purpose or "",
+                t.operation_type or "",
+                t.direction or "",
+                transaction_category=getattr(t, "transaction_category", "") or "",
+            ),
             operation_type=_fix_mojibake(t.operation_type) or "",
             purpose=_fix_mojibake(t.purpose) or "",
             currency=t.currency or "",
@@ -1121,9 +1152,11 @@ async def export_transactions(
     currency: Optional[str] = Query(None),
     sender: Optional[str] = Query(None, description="Sender IIN/BIN/Account"),
     recipient: Optional[str] = Query(None, description="Recipient IIN/BIN/Account"),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     where_clause = _build_transaction_where_clause(
+        project_id=ctx.project.project_id,
         date=date,
         category=category,
         search=search,
@@ -1165,7 +1198,13 @@ async def export_transactions(
 
     for t, uploaded_by_email in rows:
         ws.append([
-            _derive_display_category(t.category or "", t.purpose or "", t.operation_type or "", t.direction or ""),
+            _derive_display_category(
+                t.category or "",
+                t.purpose or "",
+                t.operation_type or "",
+                t.direction or "",
+                transaction_category=getattr(t, "transaction_category", "") or "",
+            ),
             _fix_mojibake(t.operation_type or ""),
             _format_transaction_dt(t),
             _fix_mojibake(t.sender_name or ""),
@@ -1201,12 +1240,12 @@ async def export_transactions(
 async def import_statement(
     file: UploadFile = File(...),
     parser_type: str = Form(PARSER_KASPI),
-    authorization: Optional[str] = Header(None),
+    ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
-    auth_payload = _require_admin(authorization)
-    uploader_email = str(auth_payload.get("email") or "").strip().lower()
+    uploader_email = str(ctx.user.email or "").strip().lower()
     parser_type = (parser_type or PARSER_KASPI).strip().lower()
+    project_id = ctx.project.project_id
 
     filename = (file.filename or "").lower()
     allowed_ext = (".xls", ".xlsx")
@@ -1224,29 +1263,78 @@ async def import_statement(
 
     if parser_type == PARSER_TRANSACTIONS_CORE:
         tx_rows, skipped = _extract_transactions_from_transactions_core_csv(content)
-        inserted = 0
         file_uuid = str(uuid4())
-        statement_uuid = str(uuid4())
-        format_uuid = str(uuid4())
         source_sheet = file.filename or "transactions_core.csv"
+        await db.execute(
+            text(
+                """
+                INSERT INTO afm.raw_files(file_id, project_id, source_bank, original_filename, sha256, parser_version)
+                VALUES (CAST(:file_id AS uuid), CAST(:project_id AS uuid), :source_bank, :filename, :sha256, :parser_version)
+                ON CONFLICT (file_id) DO NOTHING
+                """
+            ),
+            {
+                "file_id": file_uuid,
+                "project_id": project_id,
+                "source_bank": "transactions_core",
+                "filename": source_sheet,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "parser_version": settings.parser_version,
+            },
+        )
+        payloads = []
         for idx, tx in enumerate(tx_rows, start=2):
-            payload = _build_core_transaction_payload(
-                tx,
-                uploader_email=uploader_email,
-                source_bank="transactions_core",
-                source_sheet=source_sheet,
-                source_row_no=idx,
-                file_id=file_uuid,
-                statement_id=statement_uuid,
-                format_id=format_uuid,
-                raw_row_json=tx,
+            payloads.append(
+                _build_core_transaction_payload(
+                    tx,
+                    uploader_email=uploader_email,
+                    project_id=project_id,
+                    source_bank="transactions_core",
+                    source_sheet=source_sheet,
+                    source_row_no=idx,
+                    file_id=file_uuid,
+                    statement_id=None,
+                    format_id=None,
+                    raw_row_json=tx,
+                )
             )
+
+        unique_payloads = []
+        seen_hashes = set()
+        for payload in payloads:
+            row_hash = payload["row_hash"]
+            if row_hash in seen_hashes:
+                skipped += 1
+                continue
+            seen_hashes.add(row_hash)
+            unique_payloads.append(payload)
+
+        existing_hashes = set(
+            (
+                await db.execute(
+                    select(Transaction.row_hash).where(
+                        Transaction.project_id == project_id,
+                        Transaction.row_hash.in_([payload["row_hash"] for payload in unique_payloads]),
+                    )
+                )
+            ).scalars()
+        )
+
+        inserted = 0
+        for payload in unique_payloads:
+            if payload["row_hash"] in existing_hashes:
+                skipped += 1
+                continue
+
             db.add(Transaction(**payload))
-            db.add(TransactionUploadMeta(
-                tx_id=payload["id"],
-                uploaded_by_email=uploader_email or "",
-                created_at=datetime.utcnow(),
-            ))
+            db.add(
+                TransactionUploadMeta(
+                    tx_id=payload["id"],
+                    project_id=project_id,
+                    uploaded_by_email=uploader_email or "",
+                    created_at=datetime.utcnow(),
+                )
+            )
             inserted += 1
 
         await db.commit()
@@ -1268,7 +1356,7 @@ async def import_statement(
         # don't fail with "remaining connection slots are reserved".
         await db.close()
         await async_engine.dispose()
-        result = await run_in_threadpool(_run_ingestion_pipeline, tmp_path, source_bank)
+        result = await run_in_threadpool(_run_ingestion_pipeline, tmp_path, source_bank, project_id)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Ingestion pipeline failed: {exc}") from exc
     finally:
@@ -1278,7 +1366,7 @@ async def import_statement(
             pass
 
     parsed_rows = int(result.get("core_rows") or 0)
-    inserted = await _finalize_ingestion_import(result.get("file_id"), uploader_email)
+    inserted = await _finalize_ingestion_import(result.get("file_id"), uploader_email, project_id)
     skipped = max(parsed_rows - inserted, 0)
 
     bank_label = result.get("bank") or source_bank or "auto"

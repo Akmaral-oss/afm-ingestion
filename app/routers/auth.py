@@ -17,6 +17,7 @@ from ..config import settings
 from ..database import get_db
 from ..email_service import generate_verification_code, send_registration_code
 from ..models import PendingRegistration, User
+from ..project_context import ensure_user_active_project
 from ..schemas import (
     ErrorResponse,
     LoginRequest,
@@ -44,7 +45,13 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 def _user_to_out(user: User) -> UserOut:
     name = user.email.split("@")[0] if "@" in user.email else user.email
-    return UserOut(id=user.id, email=user.email, name=name)
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        name=name,
+        role=user.role,
+        active_project_id=user.active_project_id,
+    )
 
 
 def _utc_now_naive() -> datetime:
@@ -83,6 +90,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user or not verify_password(password, user.password_hash):
         raise IncorrectEmailOrPasswordException
 
+    await ensure_user_active_project(db, user)
+    await db.commit()
+    await db.refresh(user)
     token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
     return LoginResponse(token=token, user=_user_to_out(user))
 
@@ -154,6 +164,7 @@ async def register_confirm(body: RegisterConfirmRequest, db: AsyncSession = Depe
     user = User(email=email, password_hash=pending.password_hash, role="user")
     db.add(user)
     await db.flush()
+    await ensure_user_active_project(db, user)
     await db.delete(pending)
     await db.commit()
     await db.refresh(user)

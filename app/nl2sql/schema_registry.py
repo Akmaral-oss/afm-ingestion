@@ -12,6 +12,7 @@ NL_VIEW = "afm.transactions_nl_view"
 ALLOWED_COLUMNS: list[str] = [
     # ── transaction ──────────────────────────────────────────────────────────
     "tx_id",
+    "project_id",
     "source_bank",
     "operation_ts",
     "operation_date",
@@ -24,6 +25,11 @@ ALLOWED_COLUMNS: list[str] = [
     # ── description ──────────────────────────────────────────────────────────
     "operation_type_raw",
     "sdp_name",
+    "transaction_category",
+    "category_confidence",
+    "category_source",
+    "category_rule_id",
+    "needs_review",
     "purpose_code",
     "purpose_text",
     "raw_note",
@@ -58,6 +64,7 @@ ALLOWED_COLUMNS: list[str] = [
 
 # Human-readable column descriptions used in the prompt.
 COLUMN_DESCRIPTIONS: dict[str, str] = {
+    "project_id":         "Current project identifier; always scope queries to the active project",
     "operation_date":     "Дата операции",
     "operation_ts":       "Дата и время операции",
     "amount_kzt":         "Сумма операции в тенге",
@@ -69,6 +76,11 @@ COLUMN_DESCRIPTIONS: dict[str, str] = {
     "source_bank":        "Банк-источник выписки (kaspi, halyk…)",
     "operation_type_raw": "Вид операции / категория документа",
     "sdp_name":           "Наименование СДП / платёжной системы",
+    "transaction_category": "Классифицированная категория транзакции",
+    "category_confidence": "Уверенность классификатора по категории",
+    "category_source": "Источник категории: rule, embedding, other",
+    "category_rule_id": "Идентификатор правила категоризации",
+    "needs_review": "Нужно ли ручное подтверждение категории",
     "purpose_text":       "Назначение платежа",
     "raw_note":           "Примечание из выписки",
     "payer_name":         "Наименование / ФИО плательщика",

@@ -92,6 +92,16 @@ def _normalize_ranked_amount_sql(sql: str) -> str:
     return f"{normalized[:order_match.start('clause')]}{updated_clause}{normalized[order_match.end('clause'):]}"
 
 
+def _project_predicate(project_id: str) -> str:
+    return f"project_id = '{project_id}'"
+
+
+def _normalize_project_sql(sql: str, project_id: Optional[str]) -> str:
+    if not project_id:
+        return sql
+    return _inject_where_predicate(sql, _project_predicate(project_id))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Result dataclass
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +175,7 @@ class QueryService:
 
     # ── main entry point ──────────────────────────────────────────────────────
 
-    async def run(self, question: str) -> QueryResult:
+    async def run(self, question: str, project_id: Optional[str] = None) -> QueryResult:
         import asyncio
         t0 = time.perf_counter()
         repaired = False
@@ -188,10 +198,12 @@ class QueryService:
                     )
                     ai_reply = await self.intent_backend.agenerate(chat_prompt, max_new_tokens=400)
                     elapsed = time.perf_counter() - t0
-                    return QueryResult(
+                    result = QueryResult(
                         question=question, sql="", rows=[], execution_time_s=elapsed,
                         ai_summary=ai_reply, history_id=str(uuid.uuid4())
                     )
+                    await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
+                    return result
 
             # 1. rule-based entity extraction
             entities = extract_entities(question)
@@ -223,6 +235,7 @@ class QueryService:
 
             # 5. LLM SQL generation
             sql = await self.generator.agenerate(prompt)
+            sql = _normalize_project_sql(sql, project_id)
             sql = _normalize_ranked_amount_sql(sql)
             log.info("Generated SQL:\n%s", sql)
 
@@ -240,7 +253,7 @@ class QueryService:
         except SQLValidationError as ve:
             # attempt repair
             log.warning("Validation failed: %s — attempting repair", ve)
-            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding)
+            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding, project_id)
 
         except Exception as exc:
             elapsed = time.perf_counter() - t0
@@ -252,7 +265,7 @@ class QueryService:
                 error=str(exc),
                 history_id=str(uuid.uuid4()),
             )
-            await asyncio.to_thread(self._save_history, result, query_embedding)
+            await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
             return result
 
         ai_summary = None
@@ -295,10 +308,10 @@ class QueryService:
             history_id=str(uuid.uuid4()),
             ai_summary=ai_summary,
         )
-        await asyncio.to_thread(self._save_history, result, query_embedding)
+        await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
         return result
 
-    async def run_stream(self, question: str):
+    async def run_stream(self, question: str, project_id: Optional[str] = None):
         """Streaming version of run(). Yields partial progress dictionary objects."""
         import asyncio
         import pandas as pd
@@ -333,9 +346,18 @@ class QueryService:
                         yield {"event": "summary_chunk", "data": chunk}
                         
                     elapsed = time.perf_counter() - t0
+                    result = QueryResult(
+                        question=question,
+                        sql="",
+                        rows=[],
+                        execution_time_s=elapsed,
+                        ai_summary=ai_reply,
+                        history_id=str(uuid.uuid4()),
+                    )
+                    await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
                     yield {"event": "done", "data": {
                         "question": question, "sql": "", "rows": [], "execution_time_s": elapsed,
-                        "ai_summary": ai_reply, "history_id": str(uuid.uuid4())
+                        "ai_summary": ai_reply, "history_id": result.history_id
                     }}
                     return
 
@@ -356,6 +378,7 @@ class QueryService:
 
             yield {"event": "status", "data": "Generating SQL..."}
             sql = await self.generator.agenerate(prompt)
+            sql = _normalize_project_sql(sql, project_id)
             sql = _normalize_ranked_amount_sql(sql)
             
             yield {"event": "sql", "data": sql}
@@ -368,14 +391,14 @@ class QueryService:
 
         except SQLValidationError as ve:
             yield {"event": "status", "data": "Repairing SQL..."}
-            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding)
+            sql, rows, repaired = await self._repair_and_run(sql, str(ve), query_embedding, project_id)
             yield {"event": "sql", "data": sql}
 
         except Exception as exc:
             yield {"event": "error", "error": str(exc)}
             elapsed = time.perf_counter() - t0
             result = QueryResult(question=question, sql=sql, rows=[], execution_time_s=elapsed, error=str(exc), history_id=str(uuid.uuid4()))
-            await asyncio.to_thread(self._save_history, result, query_embedding)
+            await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
             yield {"event": "done", "data": result.__dict__}
             return
 
@@ -417,7 +440,7 @@ class QueryService:
             question=question, sql=sql, rows=rows, execution_time_s=elapsed,
             repaired=repaired, history_id=hist_id, ai_summary=ai_summary
         )
-        await asyncio.to_thread(self._save_history, result, query_embedding)
+        await asyncio.to_thread(self._save_history, result, query_embedding, project_id)
         
         yield {"event": "done", "data": {
             "success": True, "question": question, "sql": sql, "rows": rows,
@@ -432,9 +455,11 @@ class QueryService:
         original_sql: str,
         error: str,
         query_embedding,
+        project_id: Optional[str] = None,
     ):
         import asyncio
         repaired_sql = await self.repair.arepair(original_sql, error)
+        repaired_sql = _normalize_project_sql(repaired_sql, project_id)
         repaired_sql = _normalize_ranked_amount_sql(repaired_sql)
         validate_sql(repaired_sql)
         def _execute():
@@ -447,7 +472,7 @@ class QueryService:
 
     # ── query_history persistence ─────────────────────────────────────────────
 
-    def _save_history(self, result: QueryResult, embedding) -> None:
+    def _save_history(self, result: QueryResult, embedding, project_id: Optional[str] = None) -> None:
         if not self.save_history:
             return
         try:
@@ -463,10 +488,10 @@ class QueryService:
                         """
                         INSERT INTO afm.query_history
                           (id, question, generated_sql, execution_success, embedding,
-                           execution_time_ms, row_count, repaired, error_text)
+                           execution_time_ms, row_count, repaired, error_text, project_id)
                         VALUES
                           (CAST(:id AS uuid), :q, :sql, :ok, CAST(:emb AS vector),
-                           :exec_ms, :rows, :repaired, :err)
+                           :exec_ms, :rows, :repaired, :err, CAST(:project_id AS uuid))
                         """
                     ),
                     {
@@ -479,6 +504,7 @@ class QueryService:
                         "rows": len(result.rows) if result.rows else 0,
                         "repaired": result.repaired,
                         "err": result.error,
+                        "project_id": project_id,
                     },
                 )
         except Exception as e:
@@ -495,10 +521,10 @@ class QueryService:
                             """
                             INSERT INTO afm.query_history
                               (id, question, generated_sql, execution_success, embedding,
-                               execution_time_ms, row_count, repaired, error_text)
+                               execution_time_ms, row_count, repaired, error_text, project_id)
                             VALUES
                               (CAST(:id AS uuid), :q, :sql, :ok, :emb,
-                               :exec_ms, :rows, :repaired, :err)
+                               :exec_ms, :rows, :repaired, :err, CAST(:project_id AS uuid))
                             """
                         ),
                         {
@@ -511,6 +537,7 @@ class QueryService:
                             "rows": len(result.rows) if result.rows else 0,
                             "repaired": result.repaired,
                             "err": result.error,
+                            "project_id": project_id,
                         },
                     )
             except Exception as e2:

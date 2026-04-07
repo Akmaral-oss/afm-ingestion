@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends, Header
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.engine import Engine
 from fastapi.responses import StreamingResponse
@@ -16,6 +16,7 @@ from ..database import engine
 from ..db.schema import ensure_schema
 from ..ingestion.mapping.embedding_mapper import EmbeddingBackend
 from ..nl2sql.query_service import QueryService
+from ..project_context import ProjectContext, get_current_project_context
 from ..nl2sql.sql_generator import build_llm_backend
 from ..schemas import ChatQueryRequest, ChatQueryResponse
 from ..security import decode_access_token
@@ -85,6 +86,7 @@ def close_chat_runtime() -> None:
 async def chat_query(
     body: ChatQueryRequest,
     authorization: Optional[str] = Header(default=None),
+    ctx: ProjectContext = Depends(get_current_project_context),
 ):
     _require_chat_access(authorization)
 
@@ -93,7 +95,7 @@ async def chat_query(
         raise EmptyQuestionException
 
     runtime = _get_runtime()
-    result = await runtime.service.run(question)
+    result = await runtime.service.run(question, project_id=ctx.project.project_id)
     return ChatQueryResponse(
         success=result.success,
         question=result.question,
@@ -110,6 +112,7 @@ async def chat_query(
 async def chat_stream(
     body: ChatQueryRequest,
     authorization: Optional[str] = Header(default=None),
+    ctx: ProjectContext = Depends(get_current_project_context),
 ):
     _require_chat_access(authorization)
 
@@ -121,7 +124,7 @@ async def chat_stream(
 
     async def sse_generator():
         try:
-            async for chunk in runtime.service.run_stream(question):
+            async for chunk in runtime.service.run_stream(question, project_id=ctx.project.project_id):
                 # Standard SSE format: data: JSON\n\n
                 data_str = json.dumps(chunk, default=str)
                 yield f"data: {data_str}\n\n"

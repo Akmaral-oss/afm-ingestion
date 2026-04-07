@@ -255,7 +255,8 @@ class CanonicalMapper:
                 safe_json(dedup_payload).encode("utf-8")
             ).hexdigest()
             core["row_hash"] = row_hash
-            core["tx_id"] = str(uuid.uuid5(TXID_NAMESPACE_UUID, row_hash))
+            project_scope = str(context.get("project_id") or "global")
+            core["tx_id"] = str(uuid.uuid5(TXID_NAMESPACE_UUID, f"{project_scope}:{row_hash}"))
 
             # ── ext / unmapped ────────────────────────────────────────────────
             for c in unmapped_cols:

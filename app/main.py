@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView
 from starlette.middleware.sessions import SessionMiddleware
@@ -11,9 +12,10 @@ from sqlalchemy import text
 
 from app.admin_auth import AdminAuth
 from app.config import settings
-from app.database import Base, async_session, async_engine as engine
-from app.models import Transaction, TransactionUploadMeta, User
-from app.routers import analytics, auth, chat, transactions
+from app.database import Base, async_session, async_engine as engine, engine as sync_engine
+from app.db.schema import ensure_schema
+from app.models import Project, Transaction, TransactionUploadMeta, User
+from app.routers import analytics, auth, chat, projects, transactions
 from app.seed import seed_admin_if_missing
 
 
@@ -27,6 +29,7 @@ async def lifespan(_: FastAPI):
         
         # Schema creation is handled by init-db.sql, but we check if we have access
         await conn.run_sync(Base.metadata.create_all)
+    await run_in_threadpool(ensure_schema, sync_engine)
 
     if settings.ENABLE_SEED:
         async with async_session() as session:
@@ -80,12 +83,19 @@ class UserAdmin(ModelView, model=User):
     column_sortable_list = [User.id, User.email]
 
 
+class ProjectAdmin(ModelView, model=Project):
+    column_list = [Project.project_id, Project.name, Project.owner_user_id, Project.created_at]
+    column_searchable_list = [Project.name]
+
+
 admin = Admin(app, engine, authentication_backend=AdminAuth(secret_key=settings.SESSION_SECRET))
 admin.add_view(TransactionAdmin)
 admin.add_view(TransactionUploadMetaAdmin)
 admin.add_view(UserAdmin)
+admin.add_view(ProjectAdmin)
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(projects.router, prefix="/api/v1")
 app.include_router(transactions.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")

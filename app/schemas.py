@@ -34,6 +34,8 @@ class UserOut(BaseModel):
     id: int
     email: str
     name: str
+    role: str
+    active_project_id: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
@@ -47,6 +49,21 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
+
+
+class ProjectOut(BaseModel):
+    project_id: str
+    name: str
+    is_active: bool = False
+
+
+class ProjectListResponse(BaseModel):
+    items: list[ProjectOut]
+    active_project_id: Optional[str] = None
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
 
 
 # ---------------------------------------------------------------------------

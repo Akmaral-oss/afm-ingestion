@@ -1,7 +1,18 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, ForeignKey, Numeric, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import synonym
 from .database import Base
+
+
+class Project(Base):
+    __tablename__ = "projects"
+    __table_args__ = {"schema": "afm"}
+
+    project_id = Column(UUID(as_uuid=False), primary_key=True, index=True)
+    owner_user_id = Column(Integer, ForeignKey("afm.users.id"), nullable=False, index=True)
+    name = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class Transaction(Base):
@@ -14,6 +25,7 @@ class Transaction(Base):
     file_id = Column(UUID(as_uuid=False), nullable=True, index=True)
     statement_id = Column(UUID(as_uuid=False), nullable=True, index=True)
     format_id = Column(UUID(as_uuid=False), nullable=True, index=True)
+    project_id = Column(UUID(as_uuid=False), ForeignKey("afm.projects.project_id"), nullable=True, index=True)
 
     source_bank = Column(String, nullable=True, index=True)
     source_sheet = Column(String, nullable=True)
@@ -33,6 +45,11 @@ class Transaction(Base):
 
     operation_type = Column("operation_type_raw", Text, nullable=False, default="")
     category = Column("sdp_name", String, nullable=False, default="")
+    transaction_category = Column(Text, nullable=False, default="Прочее", index=True)
+    category_confidence = Column(Numeric(5, 4), nullable=True)
+    category_source = Column(Text, nullable=False, default="other")
+    category_rule_id = Column(Text, nullable=True)
+    needs_review = Column(Boolean, nullable=False, default=False, index=True)
     purpose_code = Column(String, nullable=True)
     purpose = Column("purpose_text", Text, nullable=False, default="")
     raw_note = Column(Text, nullable=True)
@@ -59,6 +76,7 @@ class TransactionUploadMeta(Base):
     __table_args__ = {"schema": "afm"}
 
     tx_id = Column(UUID(as_uuid=False), primary_key=True, index=True)
+    project_id = Column(UUID(as_uuid=False), ForeignKey("afm.projects.project_id"), nullable=True, index=True)
     uploaded_by_email = Column(String, nullable=False, default="", index=True)
     created_at = Column(DateTime, nullable=False)
 
@@ -70,6 +88,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="user")  # user/admin
+    active_project_id = Column(UUID(as_uuid=False), ForeignKey("afm.projects.project_id"), nullable=True, index=True)
 
 
 class PendingRegistration(Base):

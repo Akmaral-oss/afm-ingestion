@@ -23,6 +23,7 @@ from app.ingestion.registry.format_registry import FormatRegistryService
 from app.ingestion.registry.discovery_logger import DiscoveryLogger
 
 from app.ingestion.extractor.adapter_loader import load_adapters
+from app.classification import CategoryService
 from app.utils.hashing import sha256_file
 
 log = logging.getLogger(__name__)
@@ -92,6 +93,7 @@ class IngestionPipeline:
             ollama_timeout_s=settings.AFM_EMBEDDING_TIMEOUT_S,
         )
         self.mapper = CanonicalMapper(self.embedder, threshold=self.settings.EMBEDDING_THRESHOLD)
+        self.category_service = CategoryService(self.embedder)
 
         self.format_registry = FormatRegistryService(
             writer=self.writer,
@@ -150,7 +152,10 @@ class IngestionPipeline:
     # ── single file ingestion ─────────────────────────────────────────────────
 
     def ingest_file(
-        self, xlsx_path: str, source_bank: Optional[str] = None
+        self,
+        xlsx_path: str,
+        source_bank: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         file_id  = str(uuid.uuid4())
         filename = os.path.basename(xlsx_path)
@@ -159,6 +164,7 @@ class IngestionPipeline:
 
         self.writer.insert_raw_file(
             file_id=file_id,
+            project_id=project_id,
             source_bank=bank,
             filename=filename,
             sha256=checksum,
@@ -170,12 +176,27 @@ class IngestionPipeline:
         statements_count = 0
 
         adapter = self._find_adapter(bank)
+        extracted: List[AdapterDF] = []
+        if adapter is None and bank == "unknown":
+            for candidate in self.adapters:
+                try:
+                    candidate_rows: List[AdapterDF] = candidate.extract(xlsx_path) or []
+                except Exception:
+                    log.exception("Adapter auto-detect failed for bank=%s file=%s", candidate.bank_name, filename)
+                    continue
+                if candidate_rows:
+                    adapter = candidate
+                    extracted = candidate_rows
+                    bank = candidate.bank_name
+                    log.info("Smart parser auto-detected adapter=%s for file=%s", bank, filename)
+                    break
 
         # ── CASE 1: bank-specific adapter ─────────────────────────────────────
         used_adapter = False
         if adapter is not None:
             log.info("Using adapter=%s for file=%s", adapter.bank_name, filename)
-            extracted: List[AdapterDF] = adapter.extract(xlsx_path) or []
+            if not extracted:
+                extracted = adapter.extract(xlsx_path) or []
             if extracted:
                 used_adapter = True
             else:
@@ -212,6 +233,7 @@ class IngestionPipeline:
                 stmt_row = {
                     "statement_id":   statement_id,
                     "file_id":        file_id,
+                    "project_id":     project_id,
                     "source_bank":    bank,
                     "source_sheet":   stmt_meta_from_adapter.get("source_sheet"),
                     "source_block_id": stmt_meta_from_adapter.get("source_block_id", idx),
@@ -239,6 +261,7 @@ class IngestionPipeline:
                     "file_id":          file_id,
                     "statement_id":     statement_id,
                     "format_id":        format_id,
+                    "project_id":       project_id,
                     "source_bank":      bank,
                     "source_sheet":     stmt_meta_from_adapter.get("source_sheet"),
                     "source_block_id":  stmt_meta_from_adapter.get("source_block_id", idx),
@@ -286,6 +309,7 @@ class IngestionPipeline:
                     self.writer.insert_statement({
                         "statement_id":   statement_id,
                         "file_id":        file_id,
+                        "project_id":     project_id,
                         "source_bank":    bank,
                         "source_sheet":   sheet_name,
                         "source_block_id": bidx,
@@ -299,6 +323,7 @@ class IngestionPipeline:
                         "file_id":          file_id,
                         "statement_id":     statement_id,
                         "format_id":        format_id,
+                        "project_id":       project_id,
                         "source_bank":      bank,
                         "source_sheet":     sheet_name,
                         "source_block_id":  bidx,
@@ -315,6 +340,12 @@ class IngestionPipeline:
 
         # ── SEMANTIC EMBEDDING (batch, before DB insert) ───────────────────────
         if all_core:
+            for row in all_core:
+                row["project_id"] = project_id
+            try:
+                self.category_service.classify_rows(all_core)
+            except Exception:
+                log.exception("Category classification failed; continuing without blocking upload")
             log.info(
                 "Computing semantic_embedding for %d rows (embedder=%s)…",
                 len(all_core),
