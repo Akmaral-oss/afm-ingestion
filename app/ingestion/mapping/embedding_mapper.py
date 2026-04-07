@@ -34,18 +34,11 @@ class EmbeddingBackend:
             ollama_model = model_name_or_path or _DEFAULT_OLLAMA_EMBEDDING_MODEL
             if self._init_ollama(ollama_model):
                 return
-
-            # Backward compatibility: if AFM_EMBEDDING_MODEL points to local weights,
-            # transparently fall back to sentence-transformers.
-            if model_name_or_path and self._init_sentence_transformers(model_name_or_path):
-                log.warning(
-                    "Ollama embedding init failed for model '%s'; using sentence-transformers '%s'.",
-                    ollama_model,
-                    model_name_or_path,
-                )
-                return
-
-            log.warning("Embeddings disabled: could not initialize Ollama or fallback local model.")
+            log.warning(
+                "Embeddings disabled: could not initialize Ollama model '%s'. "
+                "Sentence-transformers fallback is skipped to keep upload responsive.",
+                ollama_model,
+            )
             return
 
         if self.provider in {"sentence-transformers", "sentence_transformers", "local", "hf"}:

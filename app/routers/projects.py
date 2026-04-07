@@ -98,33 +98,61 @@ async def delete_project(
         ctx.user.active_project_id = replacement.project_id
         await db.flush()
 
-    delete_steps = [
-        "DELETE FROM afm.transaction_upload_meta WHERE project_id = CAST(:project_id AS uuid)",
-        """
-        DELETE FROM afm.field_discovery_log
-        WHERE file_id IN (
-            SELECT file_id FROM afm.raw_files WHERE project_id = CAST(:project_id AS uuid)
-        )
-        """,
-        """
-        DELETE FROM afm.transactions_ext
-        WHERE tx_id IN (
-            SELECT tx_id FROM afm.transactions_core WHERE project_id = CAST(:project_id AS uuid)
-        )
-        """,
-        "DELETE FROM afm.query_history WHERE project_id = CAST(:project_id AS uuid)",
-        "DELETE FROM afm.transactions_core WHERE project_id = CAST(:project_id AS uuid)",
-        "DELETE FROM afm.statements WHERE project_id = CAST(:project_id AS uuid)",
-        "DELETE FROM afm.raw_files WHERE project_id = CAST(:project_id AS uuid)",
-        """
-        DELETE FROM afm.projects
-        WHERE project_id = CAST(:project_id AS uuid)
-          AND owner_user_id = :owner_user_id
-        """,
-    ]
+    await db.execute(
+        text("DELETE FROM afm.transaction_upload_meta WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
 
-    for stmt in delete_steps:
-        await db.execute(text(stmt), {"project_id": project_id, "owner_user_id": ctx.user.id})
+    await db.execute(
+        text(
+            """
+            DELETE FROM afm.field_discovery_log f
+            USING afm.raw_files rf
+            WHERE f.file_id = rf.file_id
+              AND rf.project_id = CAST(:project_id AS uuid)
+            """
+        ),
+        {"project_id": project_id},
+    )
+
+    await db.execute(
+        text(
+            """
+            DELETE FROM afm.transactions_ext ext
+            USING afm.transactions_core tc
+            WHERE ext.tx_id = tc.tx_id
+              AND tc.project_id = CAST(:project_id AS uuid)
+            """
+        ),
+        {"project_id": project_id},
+    )
+
+    await db.execute(
+        text("DELETE FROM afm.query_history WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
+    await db.execute(
+        text("DELETE FROM afm.transactions_core WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
+    await db.execute(
+        text("DELETE FROM afm.statements WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
+    await db.execute(
+        text("DELETE FROM afm.raw_files WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
+    await db.execute(
+        text(
+            """
+            DELETE FROM afm.projects
+            WHERE project_id = CAST(:project_id AS uuid)
+              AND owner_user_id = :owner_user_id
+            """
+        ),
+        {"project_id": project_id, "owner_user_id": ctx.user.id},
+    )
 
     await db.commit()
     await db.refresh(ctx.user)

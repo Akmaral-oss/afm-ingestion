@@ -27,7 +27,53 @@ HALYK_HEADER_MARKERS = [
     "дата/время",
     "валюта операции",
     "сумма в тенге",
+    # Some files still surface mojibake instead of proper Cyrillic.
+    "РґР°С‚Р° Рё РІСЂРµРјСЏ РѕРїРµСЂР°С†РёРё",
+    "РґР°С‚Р° РѕРїРµСЂР°С†РёРё",
+    "РґР°С‚Р°/РІСЂРµРјСЏ",
+    "РІР°Р»СЋС‚Р° РѕРїРµСЂР°С†РёРё",
+    "СЃСѓРјРјР° РІ С‚РµРЅРіРµ",
 ]
+
+
+def _is_xls(path: str) -> bool:
+    return path.lower().endswith(".xls") and not path.lower().endswith(".xlsx")
+
+
+def _get_sheet_names(path: str) -> List[str]:
+    if _is_xls(path):
+        import xlrd
+
+        wb = xlrd.open_workbook(path)
+        return wb.sheet_names()
+
+    wb = load_workbook(path, data_only=True, read_only=True)
+    return wb.sheetnames
+
+
+def _load_xlsx_grid(path: str, sheet_name: str) -> List[List[Any]]:
+    wb = load_workbook(path, data_only=True, read_only=True)
+    ws = wb[sheet_name]
+    grid: List[List[Any]] = []
+    max_col = ws.max_column
+    for row in ws.iter_rows(values_only=True):
+        grid.append(list(row[:max_col]))
+    return grid
+
+
+def _load_xls_grid(path: str, sheet_name: str) -> List[List[Any]]:
+    import xlrd
+
+    wb = xlrd.open_workbook(path)
+    ws = wb.sheet_by_name(sheet_name)
+    grid: List[List[Any]] = []
+    for r in range(ws.nrows):
+        row = []
+        for c in range(ws.ncols):
+            cell = ws.cell(r, c)
+            row.append(cell.value if cell.ctype not in (0, 5, 6) else None)
+        grid.append(row)
+    return grid
 
 
 class HalykAdapter(BankAdapter):
@@ -43,20 +89,13 @@ class HalykAdapter(BankAdapter):
         return [
             os.path.join(path, f)
             for f in os.listdir(path)
-            if f.lower().endswith(".xlsx")
+            if f.lower().endswith(".xlsx") or f.lower().endswith(".xls")
         ]
 
     def load_grid(self, path: str, sheet_name: str) -> List[List[Any]]:
-        wb = load_workbook(path, data_only=True, read_only=True)
-        ws = wb[sheet_name]
-
-        grid: List[List[Any]] = []
-        max_col = ws.max_column
-
-        for row in ws.iter_rows(values_only=True):
-            grid.append(list(row[:max_col]))
-
-        return grid
+        if _is_xls(path):
+            return _load_xls_grid(path, sheet_name)
+        return _load_xlsx_grid(path, sheet_name)
 
     def _row_join(self, row: List[Any]) -> str:
         return " ".join(norm_text(x) for x in row if x is not None)
@@ -129,10 +168,9 @@ class HalykAdapter(BankAdapter):
         return df
 
     def extract(self, file_path: str) -> List[Tuple[pd.DataFrame, Dict[str, Any]]]:
-        wb = load_workbook(file_path, data_only=True, read_only=True)
         out: List[Tuple[pd.DataFrame, Dict[str, Any]]] = []
 
-        for sheet_name in wb.sheetnames:
+        for sheet_name in _get_sheet_names(file_path):
             grid = self.load_grid(file_path, sheet_name)
             blocks = self._detect_blocks(grid, sheet_name)
 

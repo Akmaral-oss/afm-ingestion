@@ -49,11 +49,11 @@ class PostgresWriter:
 
     def get_format_by_fingerprint(self, fingerprint: str) -> Optional[str]:
         with self.engine.begin() as conn:
-            r = conn.execute(
+            result = conn.execute(
                 text("SELECT format_id::text FROM afm.format_registry WHERE header_fingerprint = :h;"),
                 {"h": fingerprint},
             ).scalar()
-            return str(r) if r else None
+            return str(result) if result else None
 
     def load_format_vectors(self, source_bank: Optional[str] = None) -> List[Dict[str, Any]]:
         sql = "SELECT format_id::text, source_bank, header_fingerprint, embedding_vector FROM afm.format_registry"
@@ -63,7 +63,7 @@ class PostgresWriter:
             params["b"] = source_bank
         with self.engine.begin() as conn:
             rows = conn.execute(text(sql), params).mappings().all()
-            return [dict(r) for r in rows]
+            return [dict(row) for row in rows]
 
     def bump_format_usage(self, format_id: str) -> None:
         with self.engine.begin() as conn:
@@ -94,7 +94,6 @@ class PostgresWriter:
             "hs": safe_json(header_sample),
             "ev": embedding_vector,
         }
-
         with self.engine.begin() as conn:
             conn.execute(
                 text(
@@ -115,9 +114,8 @@ class PostgresWriter:
             )
 
     def insert_statement(self, row: Dict[str, Any]) -> None:
-        r = dict(row)
-        r["meta_json"] = safe_json(r.get("meta_json") or {})
-
+        payload = dict(row)
+        payload["meta_json"] = safe_json(payload.get("meta_json") or {})
         with self.engine.begin() as conn:
             conn.execute(
                 text(
@@ -143,7 +141,7 @@ class PostgresWriter:
                     ON CONFLICT (statement_id) DO NOTHING;
                     """
                 ),
-                r,
+                payload,
             )
 
     def bulk_insert_core_dedup(self, rows: List[Dict[str, Any]]) -> None:
@@ -151,10 +149,30 @@ class PostgresWriter:
             return
 
         cols = list(rows[0].keys())
+        value_expr = [f":{col}" for col in cols]
+
+        update_cols = []
+        for col in (
+            "semantic_text",
+            "semantic_embedding",
+            "transaction_category",
+            "category_confidence",
+            "category_source",
+            "category_rule_id",
+            "needs_review",
+        ):
+            if col in cols:
+                update_cols.append(f"{col} = EXCLUDED.{col}")
+
+        if update_cols:
+            conflict_sql = "ON CONFLICT (project_id, row_hash) DO UPDATE SET " + ", ".join(update_cols)
+        else:
+            conflict_sql = "ON CONFLICT (project_id, row_hash) DO NOTHING"
+
         sql = f"""
         INSERT INTO afm.transactions_core ({', '.join(cols)})
-        VALUES ({', '.join([f':{c}' for c in cols])})
-        ON CONFLICT (project_id, row_hash) DO NOTHING;
+        VALUES ({', '.join(value_expr)})
+        {conflict_sql};
         """
 
         with self.engine.begin() as conn:
@@ -163,8 +181,8 @@ class PostgresWriter:
     def bulk_insert_ext(self, rows: List[Dict[str, Any]]) -> None:
         if not rows:
             return
-        for r in rows:
-            r["ext_json"] = safe_json(r["ext_json"])
+        for row in rows:
+            row["ext_json"] = safe_json(row["ext_json"])
 
         with self.engine.begin() as conn:
             conn.execute(
@@ -183,14 +201,14 @@ class PostgresWriter:
             return
 
         dedup: Dict[tuple, Dict[str, Any]] = {}
-        for r in records:
-            key = (r["file_id"], r["raw_column_name"], r.get("format_id"))
+        for record in records:
+            key = (record["file_id"], record["raw_column_name"], record.get("format_id"))
             if key not in dedup:
-                dedup[key] = r
+                dedup[key] = record
         records = list(dedup.values())
 
-        for r in records:
-            r["sample_values"] = safe_json(r.get("sample_values") or [])
+        for record in records:
+            record["sample_values"] = safe_json(record.get("sample_values") or [])
 
         with self.engine.begin() as conn:
             conn.execute(

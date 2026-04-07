@@ -224,7 +224,11 @@ class CanonicalMapper:
                     core[f] = ""
 
             core["direction"] = derive_direction(core)
-            core["direction"] = derive_direction(core)
+
+            if core["direction"] == "debit" and not core.get("amount_debit"):
+                core["amount_debit"] = core.get("amount_currency") or core.get("amount_kzt") or 0.0
+            elif core["direction"] == "credit" and not core.get("amount_credit"):
+                core["amount_credit"] = core.get("amount_currency") or core.get("amount_kzt") or 0.0
 
             # ── semantic_text ─────────────────────────────────────────────────
             core["semantic_text"] = _build_semantic_text(core) or None

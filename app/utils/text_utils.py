@@ -3,10 +3,41 @@ import re
 from typing import Any, Optional
 
 
+_MOJIBAKE_UTF8_AS_LATIN1_HINTS = ("Ð", "Ñ", "Ò", "Â")
+_MOJIBAKE_UTF8_AS_CP1251_HINTS = ("Р", "С", "Ѓ", "Ћ")
+
+
+def repair_mojibake(x: Any) -> str:
+    if x is None:
+        return ""
+
+    s = str(x)
+
+    # UTF-8 bytes decoded as latin1/cp1252: "Ð˜Ð¡Ð¥"
+    if any(h in s for h in _MOJIBAKE_UTF8_AS_LATIN1_HINTS):
+        try:
+            repaired = s.encode("latin1").decode("utf-8")
+            if repaired:
+                s = repaired
+        except Exception:
+            pass
+
+    # UTF-8 bytes decoded as cp1251: "РџРµСЂ..."
+    if any(h in s for h in _MOJIBAKE_UTF8_AS_CP1251_HINTS):
+        try:
+            repaired = s.encode("cp1251").decode("utf-8")
+            if repaired:
+                s = repaired
+        except Exception:
+            pass
+
+    return s
+
+
 def norm_text(x: Any) -> str:
     if x is None:
         return ""
-    s = str(x).strip().lower()
+    s = repair_mojibake(x).strip().lower()
     s = s.replace("\u00a0", " ")
     s = s.replace("–", "-").replace("—", "-")
     s = re.sub(r"\s+", " ", s)

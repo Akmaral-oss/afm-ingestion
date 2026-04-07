@@ -86,6 +86,7 @@ class TransactionOut(BaseModel):
     sender: CounterpartyOut
     recipient: CounterpartyOut
     category: str
+    transaction_category: str = ""
     operation_type: str
     purpose: str
     currency: str

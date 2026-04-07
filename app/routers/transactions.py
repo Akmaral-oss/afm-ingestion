@@ -1124,6 +1124,7 @@ async def list_transactions(
                 t.direction or "",
                 transaction_category=getattr(t, "transaction_category", "") or "",
             ),
+            transaction_category=_fix_mojibake(getattr(t, "transaction_category", "") or ""),
             operation_type=_fix_mojibake(t.operation_type) or "",
             purpose=_fix_mojibake(t.purpose) or "",
             currency=t.currency or "",

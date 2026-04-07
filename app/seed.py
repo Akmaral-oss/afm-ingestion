@@ -122,6 +122,9 @@ async def seed_admin_if_missing(session: AsyncSession):
     res = await session.execute(select(User).where(User.email == admin_email))
     existing = res.scalar_one_or_none()
     if existing:
+        # Keep the seeded admin password in sync with the current env so local
+        # resets and DB restores do not silently strand the login screen.
+        existing.password_hash = hash_password(admin_password)
         await ensure_user_active_project(session, existing)
         await session.commit()
         return
