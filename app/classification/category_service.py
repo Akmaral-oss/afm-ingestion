@@ -30,6 +30,7 @@ from .rule_engine import (
     classify_by_rules,
     clean_purpose_text,
     CATEGORY_NAMES,
+    CAT_CASH_TOPUP,
     CAT_OTHER,
 )
 
@@ -210,6 +211,19 @@ class CategoryService:
         tx_id        = str(row.get("tx_id") or uuid.uuid4())
 
         cleaned = clean_purpose_text(purpose_text)
+        normalized = " | ".join(
+            filter(None, [cleaned.lower(), clean_purpose_text(op_type_raw).lower()])
+        )
+
+        if "\u0440\u0435\u0441\u0430\u0439\u043a\u043b\u0435\u0440" in normalized or "recycler" in normalized:
+            return CategoryResult(
+                tx_id=tx_id,
+                transaction_category=_category_label(CAT_CASH_TOPUP),
+                category_confidence=0.99,
+                category_source="rule",
+                category_rule_id="CASH_TOPUP_DIRECT",
+                needs_review=False,
+            )
 
         # Stage 1: rules
         rule_res = classify_by_rules(purpose_text, purpose_code, op_type_raw, direction)

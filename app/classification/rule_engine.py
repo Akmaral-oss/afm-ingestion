@@ -27,6 +27,7 @@ CAT_MANDATORY  = "MANDATORY_PAYMENT"
 CAT_STATE      = "STATE_PAYMENT"
 CAT_SALARY     = "SALARY"
 CAT_TOPUP      = "ACCOUNT_TOPUP"
+CAT_CASH_TOPUP = "CASH_TOPUP"
 CAT_CONTRACT   = "CONTRACT_SETTLEMENT"
 CAT_INVOICE    = "INVOICE_PAYMENT"
 CAT_CARD       = "CARD_PAYMENT"
@@ -39,7 +40,7 @@ CAT_OTHER      = "OTHER"
 
 CATEGORY_NAMES: dict[str, str] = {
     CAT_P2P:        "P2P перевод",
-    CAT_STORE:      "Покупка в магазине",
+    CAT_STORE:      "Оплата товаров и услуг",
     CAT_INTERNAL:   "Внутренние операции",
     CAT_CASH:       "Снятие наличных",
     CAT_LOAN_REP:   "Погашение кредита",
@@ -58,6 +59,8 @@ CATEGORY_NAMES: dict[str, str] = {
     CAT_REFUND:     "Возврат средств",
     CAT_OTHER:      "Прочее",
 }
+
+CATEGORY_NAMES[CAT_CASH_TOPUP] = "Пополнение наличными"
 
 
 @dataclass(frozen=True)
@@ -188,6 +191,8 @@ _RULES: List[Rule] = [
     _r("TOPUP_02",      CAT_TOPUP,      155, r"пополнен"),
 
     # ─── Покупка в магазине ───────────────────────────────────────────────────
+    _r("CASH_TOPUP_01", CAT_CASH_TOPUP, 176,
+       "(\\u0440\\u0435\\u0441\\u0430\\u0439\\u043a\\u043b\\u0435\\u0440|recycler|\\u043f\\u043e\\u0441\\u0442\\u0443\\u043f\\u043b\\u0435\\u043d\\u0438\\u0435\\s+\\u0434\\u0435\\u043d\\u0435\\u0436\\u043d\\u044b\\u0445\\s+\\u0441\\u0440\\u0435\\u0434\\u0441\\u0442\\u0432\\s+\\u0447\\u0435\\u0440\\u0435\\u0437\\s+\\u0440\\u0435\\u0441\\u0430\\u0439\\u043a\\u043b\\u0435\\u0440)"),
     _r("STORE_01",      CAT_STORE,      160,
        r"(оплата\s+товар|покупк\w+|qr\s*pay|\bpos\b|\bmerchant\b|торгов\w*\s+точк|через\s+терминал)"),
     # "оплата товаров и услуг" = явная покупка

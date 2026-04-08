@@ -48,6 +48,14 @@ _ORDER_BY_AMOUNT_RE = re.compile(
     r"(?P<expr>(?:\b\w+\.)?amount_kzt)(?P<suffix>(?:\s+(?:ASC|DESC|NULLS\s+FIRST|NULLS\s+LAST))*)",
     re.IGNORECASE,
 )
+_SEMANTIC_ORDER_BY_RE = re.compile(
+    r"\bORDER\s+BY\s+(?:\w+\.)?semantic_embedding\s*<->\s*:query_embedding(?:\s+(?:ASC|DESC))?",
+    re.IGNORECASE,
+)
+_PROJECT_PARAM_PATTERNS = (
+    re.compile(r"%\(\s*project_id\s*\)s", re.IGNORECASE),
+    re.compile(r":project_id\b", re.IGNORECASE),
+)
 
 
 def _inject_where_predicate(sql: str, predicate: str) -> str:
@@ -96,10 +104,40 @@ def _project_predicate(project_id: str) -> str:
     return f"project_id = '{project_id}'"
 
 
+def _sql_has_project_predicate(sql: str, project_id: str) -> bool:
+    pattern = re.compile(
+        rf"\bproject_id\b\s*=\s*'{re.escape(project_id)}'",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(sql))
+
+
+def _replace_project_placeholders(sql: str, project_id: str) -> str:
+    quoted_project_id = f"'{project_id}'"
+    updated = sql
+    for pattern in _PROJECT_PARAM_PATTERNS:
+        updated = pattern.sub(quoted_project_id, updated)
+    return updated
+
+
 def _normalize_project_sql(sql: str, project_id: Optional[str]) -> str:
     if not project_id:
         return sql
-    return _inject_where_predicate(sql, _project_predicate(project_id))
+    normalized = _replace_project_placeholders(sql, project_id)
+    if _sql_has_project_predicate(normalized, project_id):
+        return normalized
+    return _inject_where_predicate(normalized, _project_predicate(project_id))
+
+
+def _normalize_embedding_sql(sql: str, embedding_enabled: bool) -> str:
+    if embedding_enabled:
+        return sql
+
+    normalized = _SEMANTIC_ORDER_BY_RE.sub("ORDER BY operation_date DESC", sql)
+    normalized = re.sub(r",\s*:query_embedding\b", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\(\s*:query_embedding\s*\)", "()", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\s+:query_embedding\b", " ", normalized, flags=re.IGNORECASE)
+    return normalized
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -236,6 +274,7 @@ class QueryService:
             # 5. LLM SQL generation
             sql = await self.generator.agenerate(prompt)
             sql = _normalize_project_sql(sql, project_id)
+            sql = _normalize_embedding_sql(sql, self.embedder.enabled)
             sql = _normalize_ranked_amount_sql(sql)
             log.info("Generated SQL:\n%s", sql)
 
@@ -379,6 +418,7 @@ class QueryService:
             yield {"event": "status", "data": "Generating SQL..."}
             sql = await self.generator.agenerate(prompt)
             sql = _normalize_project_sql(sql, project_id)
+            sql = _normalize_embedding_sql(sql, self.embedder.enabled)
             sql = _normalize_ranked_amount_sql(sql)
             
             yield {"event": "sql", "data": sql}
@@ -460,6 +500,7 @@ class QueryService:
         import asyncio
         repaired_sql = await self.repair.arepair(original_sql, error)
         repaired_sql = _normalize_project_sql(repaired_sql, project_id)
+        repaired_sql = _normalize_embedding_sql(repaired_sql, self.embedder.enabled)
         repaired_sql = _normalize_ranked_amount_sql(repaired_sql)
         validate_sql(repaired_sql)
         def _execute():

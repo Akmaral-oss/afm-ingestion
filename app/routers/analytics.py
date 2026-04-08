@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..models import Transaction
 from ..project_context import ProjectContext, get_current_project_context
+from ..utils.text_utils import clean_optional_text
 from app.exceptions import MissingIdentityFieldsException
 from ..schemas import (
     TimeSeriesResponse,
@@ -62,7 +63,10 @@ def _normalize_account(value: str) -> str:
 
 
 def _normalize_name(value: str) -> str:
-    s = (value or "").strip().strip('"').strip("'").lower()
+    cleaned = clean_optional_text(value)
+    if not cleaned:
+        return ""
+    s = cleaned.strip().strip('"').strip("'").lower()
     return " ".join(s.split())
 
 def _fix_mojibake(value: Optional[str]) -> str:
@@ -91,6 +95,7 @@ def _derived_category_expr():
             (or_(purpose.like("%red.kz%"), purpose.like("%продаж%")), "Продажи Kaspi / Red"),
             (or_(purpose.like("%погаш%"), purpose.like("%кредит%")), "Погашение кредита"),
             (or_(purpose.like("%снятие%"), purpose.like("%cash%"), purpose.like("%atm%")), "Снятие наличных"),
+            (or_(purpose.like("%ресайклер%"), purpose.like("%recycler%")), "Пополнение наличными"),
             (or_(purpose.like("%пополн%"), purpose.like("%взнос%"), purpose.like("%deposit%")), "Пополнение счёта"),
             (purpose.like("%рассроч%"), "Рассрочка Kaspi"),
             (purpose.like("%займ%"), "Выдача займа"),
@@ -110,12 +115,13 @@ def _is_invalid_iin(value: Optional[str]) -> bool:
 
 
 def _is_unknown_name(value: Optional[str]) -> bool:
-    return (value or "").strip().upper() == "UNKNOWN"
+    cleaned = clean_optional_text(value)
+    return not cleaned or cleaned.upper() == "UNKNOWN"
 
 
 def _resolve_display_name(name: Optional[str], account: Optional[str]) -> Optional[str]:
-    raw_name = _fix_mojibake((name or "").strip())
-    raw_account = (account or "").strip()
+    raw_name = _fix_mojibake(clean_optional_text(name) or "")
+    raw_account = clean_optional_text(account) or ""
     if raw_name and not _is_unknown_name(raw_name):
         return raw_name
     if raw_account:
@@ -126,9 +132,11 @@ def _resolve_display_name(name: Optional[str], account: Optional[str]) -> Option
 def _display_name_expr(name_col, account_col):
     trimmed_name = func.trim(name_col)
     trimmed_account = func.trim(account_col)
+    invalid_name = func.lower(func.coalesce(trimmed_name, "")).in_(
+        ["nan", "none", "null", "nat", "<na>", "n/a", "unknown"]
+    )
     return case(
-        (or_(trimmed_name.is_(None), trimmed_name == ""), trimmed_account),
-        (func.upper(trimmed_name) == "UNKNOWN", trimmed_account),
+        (or_(trimmed_name.is_(None), trimmed_name == "", invalid_name), trimmed_account),
         else_=trimmed_name,
     )
 

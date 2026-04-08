@@ -17,6 +17,8 @@ import os
 import re
 from abc import ABC, abstractmethod
 
+from dotenv import load_dotenv
+
 log = logging.getLogger(__name__)
 
 _CODE_FENCE_RE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -157,6 +159,7 @@ class GeminiBackend(LLMBackend):
         model: str = "gemini-3-flash-preview",
         api_key_env: str = "GEMINI_API_KEY",
     ):
+        load_dotenv()
         self.model = model
         self.api_key_env = api_key_env
 
@@ -190,7 +193,7 @@ class GeminiBackend(LLMBackend):
         ]
         generate_content_config = types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(
-                thinking_level="LOW",
+                include_thoughts=False,
             ),
             safety_settings=[
                 types.SafetySetting(
@@ -252,7 +255,7 @@ class GeminiBackend(LLMBackend):
         ]
         generate_content_config = types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(
-                thinking_level="LOW",
+                include_thoughts=False,
             ),
             safety_settings=[
                 types.SafetySetting(

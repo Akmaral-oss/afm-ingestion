@@ -104,7 +104,7 @@ async def get_user_projects(db: AsyncSession, user: User) -> list[Project]:
     )
 
 
-async def get_current_project_context(
+async def resolve_project_context(
     authorization: Optional[str] = Header(default=None),
     x_project_id: Optional[str] = Header(default=None, alias="X-Project-Id"),
     db: AsyncSession = Depends(get_db),
@@ -149,3 +149,15 @@ async def get_current_project_context(
         active_project = selected
 
     return ProjectContext(payload=payload, user=user, project=active_project)
+
+
+async def get_current_project_context(
+    authorization: Optional[str] = Header(default=None),
+    x_project_id: Optional[str] = Header(default=None, alias="X-Project-Id"),
+    db: AsyncSession = Depends(get_db),
+) -> ProjectContext:
+    return await resolve_project_context(
+        authorization=authorization,
+        x_project_id=x_project_id,
+        db=db,
+    )

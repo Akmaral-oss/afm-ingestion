@@ -34,10 +34,28 @@ def repair_mojibake(x: Any) -> str:
     return s
 
 
-def norm_text(x: Any) -> str:
+def clean_optional_text(x: Any) -> Optional[str]:
     if x is None:
+        return None
+    try:
+        if x != x:
+            return None
+    except Exception:
+        pass
+
+    s = repair_mojibake(x).strip()
+    if not s:
+        return None
+    if s.lower() in {"nan", "none", "null", "nat", "<na>", "n/a"}:
+        return None
+    return s
+
+
+def norm_text(x: Any) -> str:
+    cleaned = clean_optional_text(x)
+    if cleaned is None:
         return ""
-    s = repair_mojibake(x).strip().lower()
+    s = cleaned.lower()
     s = s.replace("\u00a0", " ")
     s = s.replace("–", "-").replace("—", "-")
     s = re.sub(r"\s+", " ", s)

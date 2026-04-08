@@ -46,6 +46,13 @@ PARSER_KASPI_LEGACY = "kaspi_parser"
 PARSER_HALYK = "halyk_parser"
 PARSER_SMART = "smart_parser"
 PARSER_TRANSACTIONS_CORE = "transactions_core"
+_KZT_CONVERSION_RATES = {
+    "KZT": 1.0,
+    "USD": 475.50,
+    "EUR": 520.30,
+    "RUB": 5.20,
+    "CNY": 66.00,
+}
 
 
 def _parse_date(date_str: str) -> datetime:
@@ -140,6 +147,24 @@ def _safe_amount_tenge(amount_kzt: float, debit: float, credit: float) -> float:
     return amount
 
 
+def _resolve_amount_tenge(currency: str, amount_currency: float, amount_kzt: float, debit: float, credit: float) -> float:
+    normalized_currency = (currency or "KZT").strip().upper() or "KZT"
+    raw_amount_kzt = float(amount_kzt or 0)
+    if raw_amount_kzt > 0:
+        return _safe_amount_tenge(raw_amount_kzt, debit, credit)
+
+    base_amount = float(amount_currency or 0)
+    if base_amount <= 0:
+        base_amount = max(float(debit or 0), float(credit or 0))
+    if base_amount <= 0:
+        return 0.0
+
+    rate = _KZT_CONVERSION_RATES.get(normalized_currency)
+    if rate is None:
+        return base_amount if normalized_currency == "KZT" else 0.0
+    return round(base_amount * rate, 2)
+
+
 def _to_str(value: object, max_len: int = 255) -> str:
     if value is None:
         return ""
@@ -185,6 +210,7 @@ def _derived_category_expr():
             (or_(purpose.like("%red.kz%"), purpose.like("%продаж%")), "Продажи Kaspi / Red"),
             (or_(purpose.like("%погаш%"), purpose.like("%кредит%")), "Погашение кредита"),
             (or_(purpose.like("%снятие%"), purpose.like("%cash%"), purpose.like("%atm%")), "Снятие наличных"),
+            (or_(purpose.like("%ресайклер%"), purpose.like("%recycler%")), "Пополнение наличными"),
             (or_(purpose.like("%пополн%"), purpose.like("%взнос%"), purpose.like("%deposit%")), "Пополнение счёта"),
             (purpose.like("%рассроч%"), "Рассрочка Kaspi"),
             (purpose.like("%займ%"), "Выдача займа"),
@@ -213,6 +239,13 @@ def _normalize_counterparty_identity(name: str, iin: str, account: str) -> tuple
     return fixed_name, fixed_iin, fixed_account
 
 
+def _resolve_counterparty_display_name(name: object, iin: object, account: object) -> str:
+    normalized_name = _fix_mojibake(_to_str(name, 255)).strip()
+    normalized_iin = re.sub(r"\D+", "", str(iin or ""))[:12]
+    normalized_account = (str(account or "").strip().upper())[:64]
+    return normalized_name or normalized_iin or normalized_account or ""
+
+
 def _derive_category_from_core_row(sdp_name: str, purpose_text: str, operation_type_raw: str, direction: str) -> str:
     sdp = _fix_mojibake(sdp_name or "").strip()
     if sdp:
@@ -228,6 +261,8 @@ def _derive_category_from_core_row(sdp_name: str, purpose_text: str, operation_t
         return "Погашение кредита"
     if "снятие" in purpose or "cash" in purpose or "atm" in purpose:
         return "Снятие наличных"
+    if "\u0440\u0435\u0441\u0430\u0439\u043a\u043b\u0435\u0440" in purpose or "recycler" in purpose:
+        return "Пополнение наличными"
     if "пополн" in purpose or "взнос" in purpose or "deposit" in purpose:
         return "Пополнение счёта"
     if "рассроч" in purpose:
@@ -274,7 +309,14 @@ def _extract_transactions_from_transactions_core_csv(content: bytes) -> tuple[li
             elif direction == "credit":
                 credit = amount_currency
 
-        amount_tenge = _safe_amount_tenge(_to_float(row.get("amount_kzt")), debit, credit)
+        currency = _to_str(row.get("currency"), 3).upper() or "KZT"
+        amount_tenge = _resolve_amount_tenge(
+            currency,
+            amount_currency,
+            _to_float(row.get("amount_kzt")),
+            debit,
+            credit,
+        )
         if amount_tenge <= 0:
             skipped += 1
             continue
@@ -310,7 +352,7 @@ def _extract_transactions_from_transactions_core_csv(content: bytes) -> tuple[li
             "purpose": purpose,
             "category": category,
             "operation_type": operation_type or direction,
-            "currency": _to_str(row.get("currency"), 3).upper() or "KZT",
+            "currency": currency,
             "debit": debit,
             "credit": credit,
             "amount_tenge": amount_tenge,
@@ -553,12 +595,20 @@ def _build_core_transaction_payload(
         "purpose_code": None,
         "purpose": _fix_mojibake(tx.get("purpose") or ""),
         "raw_note": _fix_mojibake(tx.get("purpose") or ""),
-        "sender_name": _fix_mojibake(tx.get("sender_name") or ""),
+        "sender_name": _resolve_counterparty_display_name(
+            tx.get("sender_name"),
+            tx.get("sender_iin_bin"),
+            tx.get("sender_account"),
+        ),
         "sender_iin_bin": (tx.get("sender_iin_bin") or "")[:32],
         "payer_residency": None,
         "payer_bank": None,
         "sender_account": (tx.get("sender_account") or "")[:64],
-        "recipient_name": _fix_mojibake(tx.get("recipient_name") or ""),
+        "recipient_name": _resolve_counterparty_display_name(
+            tx.get("recipient_name"),
+            tx.get("recipient_iin_bin"),
+            tx.get("recipient_account"),
+        ),
         "recipient_iin_bin": (tx.get("recipient_iin_bin") or "")[:32],
         "receiver_residency": None,
         "receiver_bank": None,

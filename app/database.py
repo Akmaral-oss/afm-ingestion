@@ -1,3 +1,4 @@
+import asyncio
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine
@@ -77,6 +78,13 @@ async def get_db():
         try:
             yield session
         finally:
-            await session.close()
+            try:
+                await asyncio.shield(session.rollback())
+            except Exception:
+                pass
+            try:
+                await asyncio.shield(session.close())
+            except Exception:
+                pass
 
     

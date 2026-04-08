@@ -12,7 +12,7 @@ from app.ingestion.mapping.rule_mapping import rule_map_column, RULE_BASED_HEADE
 from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
 from app.ingestion.mapping.direction_logic import derive_direction
 
-from app.utils.text_utils import norm_text, looks_like_iin_bin
+from app.utils.text_utils import clean_optional_text, norm_text, looks_like_iin_bin
 from app.utils.date_utils import parse_datetime
 from app.utils.number_utils import parse_decimal
 from app.utils.json_utils import safe_json
@@ -42,6 +42,13 @@ CANONICAL_FIELD_DESCRIPTIONS = {
 }
 
 TXID_NAMESPACE_UUID = uuid.UUID("b7c8b2f7-8a2a-4a3f-a5ad-1a8b7ddc0e7a")
+_KZT_CONVERSION_RATES = {
+    "KZT": 1.0,
+    "USD": 475.50,
+    "EUR": 520.30,
+    "RUB": 5.20,
+    "CNY": 66.00,
+}
 
 # ── semantic_text field order ─────────────────────────────────────────────────
 # These four fields are concatenated (non-null, non-empty) to form the
@@ -62,6 +69,52 @@ def _build_semantic_text(core: Dict[str, Any]) -> str:
         if core.get(f) and str(core[f]).strip()
     ]
     return " | ".join(parts)
+
+
+def _coerce_float(value: Any) -> float:
+    try:
+        if value is None:
+            return 0.0
+        return float(value)
+    except Exception:
+        return 0.0
+
+
+def _resolve_amount_kzt(core: Dict[str, Any]) -> float:
+    amount_kzt = _coerce_float(core.get("amount_kzt"))
+    if amount_kzt > 0:
+        return round(amount_kzt, 2)
+
+    amount_currency = _coerce_float(core.get("amount_currency"))
+    if amount_currency <= 0:
+        amount_currency = max(
+            _coerce_float(core.get("amount_debit")),
+            _coerce_float(core.get("amount_credit")),
+        )
+    if amount_currency <= 0:
+        return 0.0
+
+    currency = str(core.get("currency") or "KZT").strip().upper() or "KZT"
+    rate = _KZT_CONVERSION_RATES.get(currency)
+    if rate is None:
+        return round(amount_currency, 2) if currency == "KZT" else 0.0
+    return round(amount_currency * rate, 2)
+
+
+def _resolve_counterparty_name(name: Any, iin_bin: Any, account: Any) -> str | None:
+    normalized_name = clean_optional_text(name)
+    if normalized_name:
+        return normalized_name
+
+    normalized_iin = clean_optional_text(iin_bin)
+    if normalized_iin:
+        return normalized_iin
+
+    normalized_account = clean_optional_text(account)
+    if normalized_account:
+        return normalized_account
+
+    return None
 
 
 class CanonicalMapper:
@@ -206,17 +259,30 @@ class CanonicalMapper:
                         warnings.append(f"bad_iinbin:{canon}:{val}")
 
                 elif canon == "purpose_text":
-                    s = str(val).strip() if val is not None else None
+                    s = clean_optional_text(val)
                     core["purpose_text"] = s
                     core["raw_note"] = s
 
                 else:
-                    core[canon] = str(val).strip() if val is not None else None
+                    core[canon] = clean_optional_text(val)
 
             # Ensure NOT NULL numeric fields are always float, never None
             for f in ("amount_kzt", "amount_currency", "amount_credit", "amount_debit"):
                 if core.get(f) is None:
                     core[f] = 0.0
+
+            core["currency"] = str(core.get("currency") or "KZT").strip().upper() or "KZT"
+            core["amount_kzt"] = _resolve_amount_kzt(core)
+            core["payer_name"] = _resolve_counterparty_name(
+                core.get("payer_name"),
+                core.get("payer_iin_bin"),
+                core.get("payer_account"),
+            )
+            core["receiver_name"] = _resolve_counterparty_name(
+                core.get("receiver_name"),
+                core.get("receiver_iin_bin"),
+                core.get("receiver_account"),
+            )
 
             # Ensure NOT NULL string fields are always string, never None
             for f in ("sdp_name",):

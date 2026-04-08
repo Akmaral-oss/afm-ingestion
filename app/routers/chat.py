@@ -12,11 +12,11 @@ import json
 
 
 from ..config import settings
-from ..database import engine
+from ..database import async_session, engine
 from ..db.schema import ensure_schema
 from ..ingestion.mapping.embedding_mapper import EmbeddingBackend
 from ..nl2sql.query_service import QueryService
-from ..project_context import ProjectContext, get_current_project_context
+from ..project_context import ProjectContext, get_current_project_context, resolve_project_context
 from ..nl2sql.sql_generator import build_llm_backend
 from ..schemas import ChatQueryRequest, ChatQueryResponse
 from ..security import decode_access_token
@@ -112,7 +112,7 @@ async def chat_query(
 async def chat_stream(
     body: ChatQueryRequest,
     authorization: Optional[str] = Header(default=None),
-    ctx: ProjectContext = Depends(get_current_project_context),
+    x_project_id: Optional[str] = Header(default=None, alias="X-Project-Id"),
 ):
     _require_chat_access(authorization)
 
@@ -121,10 +121,18 @@ async def chat_stream(
         raise EmptyQuestionException
 
     runtime = _get_runtime()
+    async with async_session() as db:
+        ctx = await resolve_project_context(
+            authorization=authorization,
+            x_project_id=x_project_id,
+            db=db,
+        )
+        project_id = ctx.project.project_id
+        await db.commit()
 
     async def sse_generator():
         try:
-            async for chunk in runtime.service.run_stream(question, project_id=ctx.project.project_id):
+            async for chunk in runtime.service.run_stream(question, project_id=project_id):
                 # Standard SSE format: data: JSON\n\n
                 data_str = json.dumps(chunk, default=str)
                 yield f"data: {data_str}\n\n"
