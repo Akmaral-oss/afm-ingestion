@@ -52,6 +52,10 @@ _SEMANTIC_ORDER_BY_RE = re.compile(
     r"\bORDER\s+BY\s+(?:\w+\.)?semantic_embedding\s*<->\s*:query_embedding(?:\s+(?:ASC|DESC))?",
     re.IGNORECASE,
 )
+_YEAR_EQUALS_RE = re.compile(
+    r"YEAR\(\s*(?P<expr>(?:\w+\.)?operation_date)\s*\)\s*=\s*(?P<year>\d{4})",
+    re.IGNORECASE,
+)
 _PROJECT_PARAM_PATTERNS = (
     re.compile(r"%\(\s*project_id\s*\)s", re.IGNORECASE),
     re.compile(r":project_id\b", re.IGNORECASE),
@@ -138,6 +142,16 @@ def _normalize_embedding_sql(sql: str, embedding_enabled: bool) -> str:
     normalized = re.sub(r"\(\s*:query_embedding\s*\)", "()", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\s+:query_embedding\b", " ", normalized, flags=re.IGNORECASE)
     return normalized
+
+
+def _normalize_postgres_date_sql(sql: str) -> str:
+    def repl(match: re.Match) -> str:
+        expr = match.group("expr")
+        year = match.group("year")
+        next_year = str(int(year) + 1)
+        return f"{expr} >= '{year}-01-01' AND {expr} < '{next_year}-01-01'"
+
+    return _YEAR_EQUALS_RE.sub(repl, sql)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -275,6 +289,7 @@ class QueryService:
             sql = await self.generator.agenerate(prompt)
             sql = _normalize_project_sql(sql, project_id)
             sql = _normalize_embedding_sql(sql, self.embedder.enabled)
+            sql = _normalize_postgres_date_sql(sql)
             sql = _normalize_ranked_amount_sql(sql)
             log.info("Generated SQL:\n%s", sql)
 
@@ -419,6 +434,7 @@ class QueryService:
             sql = await self.generator.agenerate(prompt)
             sql = _normalize_project_sql(sql, project_id)
             sql = _normalize_embedding_sql(sql, self.embedder.enabled)
+            sql = _normalize_postgres_date_sql(sql)
             sql = _normalize_ranked_amount_sql(sql)
             
             yield {"event": "sql", "data": sql}
@@ -501,6 +517,7 @@ class QueryService:
         repaired_sql = await self.repair.arepair(original_sql, error)
         repaired_sql = _normalize_project_sql(repaired_sql, project_id)
         repaired_sql = _normalize_embedding_sql(repaired_sql, self.embedder.enabled)
+        repaired_sql = _normalize_postgres_date_sql(repaired_sql)
         repaired_sql = _normalize_ranked_amount_sql(repaired_sql)
         validate_sql(repaired_sql)
         def _execute():

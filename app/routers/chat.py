@@ -13,7 +13,6 @@ import json
 
 from ..config import settings
 from ..database import async_session, engine
-from ..db.schema import ensure_schema
 from ..ingestion.mapping.embedding_mapper import EmbeddingBackend
 from ..nl2sql.query_service import QueryService
 from ..project_context import ProjectContext, get_current_project_context, resolve_project_context
@@ -53,8 +52,6 @@ def _require_chat_access(authorization: Optional[str]) -> dict:
 
 @lru_cache(maxsize=1)
 def _get_runtime() -> NL2SQLRuntime:
-    ensure_schema(engine)
-
     embedder = EmbeddingBackend(
         settings.nl2sql_embedding_model,
         provider=settings.AFM_EMBEDDING_PROVIDER,

@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db, async_session, async_engine
+from ..import_fraud import ImportedTransactionSample, detect_import_fraud_warnings
 from ..ingestion.pipeline import IngestionPipeline
 from ..models import Transaction, TransactionUploadMeta
 from ..project_context import ProjectContext, get_current_project_context
@@ -109,6 +110,97 @@ def _decode_text_bytes(content: bytes) -> str:
         except UnicodeDecodeError:
             continue
     return content.decode("utf-8", errors="replace")
+
+
+def _to_import_fraud_sample(tx: Transaction) -> ImportedTransactionSample:
+    return ImportedTransactionSample(
+        tx_id=str(tx.id),
+        operation_date=tx.operation_date,
+        operation_ts=tx.date,
+        amount_kzt=float(tx.amount_tenge or 0),
+        credit=float(tx.credit or 0),
+        debit=float(tx.debit or 0),
+        direction=str(tx.direction or ""),
+        purpose_text=str(tx.purpose or ""),
+        operation_type_raw=str(tx.operation_type or ""),
+        transaction_category=str(tx.transaction_category or ""),
+        payer_name=str(tx.sender_name or ""),
+        payer_iin_bin=str(tx.sender_iin_bin or ""),
+        payer_account=str(tx.sender_account or ""),
+        receiver_name=str(tx.recipient_name or ""),
+        receiver_iin_bin=str(tx.recipient_iin_bin or ""),
+        receiver_account=str(tx.recipient_account or ""),
+    )
+
+
+def _serialize_import_fraud_warnings(transactions: list[Transaction]) -> list[dict]:
+    warnings = detect_import_fraud_warnings(_to_import_fraud_sample(tx) for tx in transactions)
+    return [
+        {
+            "code": warning.code,
+            "title": warning.title,
+            "severity": warning.severity,
+            "summary": warning.summary,
+            "articles": list(warning.articles),
+            "indicators": [
+                {"label": indicator.label, "value": indicator.value}
+                for indicator in warning.indicators
+            ],
+            "counterparties": [
+                {
+                    "role": counterparty.role,
+                    "name": counterparty.name,
+                    "identifier": counterparty.identifier,
+                    "transaction_count": counterparty.transaction_count,
+                    "turnover": counterparty.turnover,
+                    "articles": list(counterparty.articles),
+                    "graph_iin_bin": counterparty.graph_iin_bin or None,
+                }
+                for counterparty in warning.counterparties
+            ],
+            "sample_transactions": [
+                {
+                    "tx_id": tx.tx_id,
+                    "happened_at": tx.happened_at,
+                    "direction": tx.direction,
+                    "amount": tx.amount,
+                    "counterparty": tx.counterparty,
+                    "purpose": tx.purpose,
+                }
+                for tx in warning.sample_transactions
+            ],
+        }
+        for warning in warnings
+    ]
+
+
+async def _build_import_fraud_warnings_for_file(
+    file_id: Optional[str],
+    project_id: Optional[str],
+    db: Optional[AsyncSession] = None,
+) -> list[dict]:
+    if not file_id or not project_id:
+        return []
+
+    async def _load(session: AsyncSession) -> list[dict]:
+        result = await session.execute(
+            select(Transaction)
+            .where(
+                Transaction.file_id == file_id,
+                Transaction.project_id == project_id,
+            )
+            .order_by(Transaction.operation_date.asc(), Transaction.date.asc())
+        )
+        transactions = result.scalars().all()
+        if not transactions:
+            return []
+        return _serialize_import_fraud_warnings(transactions)
+
+    if db is not None:
+        return await _load(db)
+
+    async with async_session() as session:
+        return await _load(session)
 
 
 def _to_float(value: object) -> float:
@@ -1400,10 +1492,12 @@ async def import_statement(
             inserted += 1
 
         await db.commit()
+        fraud_warnings = await _build_import_fraud_warnings_for_file(file_uuid, project_id, db)
         return TransactionImportResponse(
             inserted=inserted,
             skipped=skipped,
             message=f"Imported {inserted} transactions from transactions_core CSV",
+            fraud_warnings=fraud_warnings,
         )
     source_bank = _parser_type_to_source_bank(parser_type)
 
@@ -1430,12 +1524,14 @@ async def import_statement(
     parsed_rows = int(result.get("core_rows") or 0)
     inserted = await _finalize_ingestion_import(result.get("file_id"), uploader_email, project_id)
     skipped = max(parsed_rows - inserted, 0)
+    fraud_warnings = await _build_import_fraud_warnings_for_file(result.get("file_id"), project_id)
 
     bank_label = result.get("bank") or source_bank or "auto"
     return TransactionImportResponse(
         inserted=inserted,
         skipped=skipped,
         message=f"Imported {inserted} transactions via {bank_label}",
+        fraud_warnings=fraud_warnings,
     )
 
 

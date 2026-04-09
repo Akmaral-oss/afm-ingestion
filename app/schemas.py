@@ -114,10 +114,46 @@ class TransactionListResponse(BaseModel):
     summary: SummaryOut
 
 
+class ImportFraudIndicatorOut(BaseModel):
+    label: str
+    value: str
+
+
+class ImportFraudCounterpartyOut(BaseModel):
+    role: str
+    name: str
+    identifier: str
+    transaction_count: int
+    turnover: str
+    articles: list[str] = Field(default_factory=list)
+    graph_iin_bin: Optional[str] = None
+
+
+class ImportFraudTransactionOut(BaseModel):
+    tx_id: str
+    happened_at: str
+    direction: str
+    amount: str
+    counterparty: str
+    purpose: str
+
+
+class ImportFraudWarningOut(BaseModel):
+    code: str
+    title: str
+    severity: str
+    summary: str
+    articles: list[str] = Field(default_factory=list)
+    indicators: list[ImportFraudIndicatorOut] = Field(default_factory=list)
+    counterparties: list[ImportFraudCounterpartyOut] = Field(default_factory=list)
+    sample_transactions: list[ImportFraudTransactionOut] = Field(default_factory=list)
+
+
 class TransactionImportResponse(BaseModel):
     inserted: int
     skipped: int
     message: str
+    fraud_warnings: list[ImportFraudWarningOut] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
