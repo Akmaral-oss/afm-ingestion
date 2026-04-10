@@ -1,4 +1,4 @@
-﻿"""
+"""
 Pydantic schemas matching the API spec.
 """
 
@@ -324,3 +324,25 @@ class ChatQueryResponse(BaseModel):
     repaired: bool = False
     error: Optional[str] = None
     ai_summary: Optional[str] = None
+
+
+class RawFileOut(BaseModel):
+    file_id: str
+    original_filename: str
+    uploaded_at: str
+    source_bank: str
+
+
+class RawFileListResponse(BaseModel):
+    items: list[RawFileOut]
+
+
+class ChatHistoryItem(BaseModel):
+    id: str
+    question: str
+    created_at: str
+    execution_success: bool = False
+
+
+class ChatHistoryResponse(BaseModel):
+    items: list[ChatHistoryItem]

@@ -5,7 +5,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Project
+from ..models import Project, RawFile
 from ..project_context import (
     ProjectContext,
     create_project_for_user,
@@ -13,7 +13,7 @@ from ..project_context import (
     get_current_project_context,
     get_user_projects,
 )
-from ..schemas import ProjectCreateRequest, ProjectListResponse, ProjectOut
+from ..schemas import ProjectCreateRequest, ProjectListResponse, ProjectOut, RawFileListResponse, RawFileOut
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -158,3 +158,35 @@ async def delete_project(
     await db.refresh(ctx.user)
     fresh_items = await get_user_projects(db, ctx.user)
     return _serialize_projects(fresh_items, ctx.user.active_project_id)
+
+
+@router.get("/{project_id}/files", response_model=RawFileListResponse)
+async def list_project_files(
+    project_id: str,
+    ctx: ProjectContext = Depends(get_current_project_context),
+    db: AsyncSession = Depends(get_db),
+):
+    # Ensure project exists and belongs to user
+    stmt = select(Project).where(
+        Project.project_id == project_id,
+        Project.owner_user_id == ctx.user.id,
+    )
+    project = (await db.execute(stmt)).scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    # Fetch files
+    stmt = select(RawFile).where(RawFile.project_id == project_id).order_by(RawFile.uploaded_at.desc())
+    files = (await db.execute(stmt)).scalars().all()
+
+    return RawFileListResponse(
+        items=[
+            RawFileOut(
+                file_id=str(f.file_id),
+                original_filename=f.original_filename,
+                uploaded_at=f.uploaded_at.isoformat(),
+                source_bank=f.source_bank,
+            )
+            for f in files
+        ]
+    )

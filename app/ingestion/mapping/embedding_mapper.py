@@ -24,7 +24,7 @@ class EmbeddingBackend:
         self.model_name_or_path = model_name_or_path
         self.ollama_base_url = ollama_base_url.rstrip("/")
         # requests timeout=None means no timeout.
-        self.ollama_timeout_s = None if ollama_timeout_s <= 0 else ollama_timeout_s
+        self.ollama_timeout_s = (ollama_timeout_s if ollama_timeout_s > 0 else 10)
         self._resolved_provider = "disabled"
 
         if self.provider in {"disabled", "disable", "none", "off"}:

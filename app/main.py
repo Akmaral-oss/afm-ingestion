@@ -27,8 +27,13 @@ async def lifespan(_: FastAPI):
         user, db = result.fetchone()
         print(f"INFO: Database identity: user='{user}', database='{db}'")
         
-        # Schema creation is handled by init-db.sql, but we check if we have access
+        # 1. Ensure schema exists first
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS afm;"))
+        
+        # 2. Map ORM models to tables
         await conn.run_sync(Base.metadata.create_all)
+        
+    # 3. Handle complex views, extensions, and incremental updates
     await run_in_threadpool(ensure_schema, sync_engine)
 
     if settings.ENABLE_SEED:

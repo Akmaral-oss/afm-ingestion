@@ -1,4 +1,4 @@
-﻿"""
+"""
 Transactions API:
 - GET /api/v1/transactions
 - POST /api/v1/transactions/import-statement
@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db, async_session, async_engine
-from ..import_fraud import ImportedTransactionSample, detect_import_fraud_warnings
+from ..ingestion.fraud import ImportedTransactionSample, detect_import_fraud_warnings
 from ..ingestion.pipeline import IngestionPipeline
 from ..models import Transaction, TransactionUploadMeta
 from ..project_context import ProjectContext, get_current_project_context

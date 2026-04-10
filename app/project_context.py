@@ -133,20 +133,27 @@ async def resolve_project_context(
     active_project = await ensure_user_active_project(db, user)
 
     if x_project_id and x_project_id != active_project.project_id:
-        selected = (
-            await db.execute(
-                select(Project).where(
-                    Project.project_id == x_project_id,
-                    Project.owner_user_id == user.id,
+        try:
+            selected = (
+                await db.execute(
+                    select(Project).where(
+                        Project.project_id == x_project_id,
+                        Project.owner_user_id == user.id,
+                    )
                 )
-            )
-        ).scalar_one_or_none()
-        if not selected:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-        user.active_project_id = selected.project_id
-        await db.commit()
-        await db.refresh(user)
-        active_project = selected
+            ).scalar_one_or_none()
+            
+            if selected:
+                user.active_project_id = selected.project_id
+                await db.commit()
+                await db.refresh(user)
+                active_project = selected
+            else:
+                # If project in header does not exist or belong to user, 
+                # we just stick with the one returned by ensure_user_active_project
+                print(f"WARN: Requested project {x_project_id} not found for user {user.email}. Falling back to default.")
+        except Exception as e:
+            print(f"ERROR: Failed to resolve X-Project-Id {x_project_id}: {e}")
 
     return ProjectContext(payload=payload, user=user, project=active_project)
 

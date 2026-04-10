@@ -85,7 +85,7 @@ class OllamaBackend(LLMBackend):
         self.model = model
         self.base_url = base_url
         # requests timeout=None means no timeout.
-        self.timeout_s = None if timeout_s <= 0 else timeout_s
+        self.timeout_s = (timeout_s if timeout_s > 0 else 30)
 
     def generate(self, prompt: str, max_new_tokens: int = 512, **kwargs) -> str:
         import requests

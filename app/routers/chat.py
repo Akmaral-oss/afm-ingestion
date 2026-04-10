@@ -15,9 +15,10 @@ from ..config import settings
 from ..database import async_session, engine
 from ..ingestion.mapping.embedding_mapper import EmbeddingBackend
 from ..nl2sql.query_service import QueryService
+from ..models import QueryHistory
 from ..project_context import ProjectContext, get_current_project_context, resolve_project_context
 from ..nl2sql.sql_generator import build_llm_backend
-from ..schemas import ChatQueryRequest, ChatQueryResponse
+from ..schemas import ChatHistoryResponse, ChatHistoryItem, ChatQueryRequest, ChatQueryResponse
 from ..security import decode_access_token
 from app.exceptions import (
     EmptyQuestionException,
@@ -138,3 +139,32 @@ async def chat_stream(
             yield f"data: {err_str}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+@router.get("/history", response_model=ChatHistoryResponse)
+async def chat_history(
+    ctx: ProjectContext = Depends(get_current_project_context),
+):
+    from ..database import async_session
+    from sqlalchemy import select
+
+    async with async_session() as db:
+        stmt = (
+            select(QueryHistory)
+            .where(QueryHistory.project_id == ctx.project.project_id)
+            .order_by(QueryHistory.created_at.desc())
+            .limit(50)
+        )
+        history = (await db.execute(stmt)).scalars().all()
+
+        return ChatHistoryResponse(
+            items=[
+                ChatHistoryItem(
+                    id=str(h.id),
+                    question=h.question,
+                    created_at=h.created_at.isoformat(),
+                    execution_success=h.execution_success,
+                )
+                for h in history
+            ]
+        )
