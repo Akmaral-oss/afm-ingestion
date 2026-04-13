@@ -15,6 +15,9 @@ def _is_ignorable_ddl_error(exc: Exception) -> bool:
         "must be owner of" in message
         or "permission denied" in message
         or "insufficient privilege" in message
+        or 'extension "vector" is not available' in message
+        or 'could not open extension control file' in message
+        or 'расширение "vector" отсутствует' in message
     )
 
 

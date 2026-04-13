@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_, or_, case, literal, literal_column, cast, DateTime, union_all
+from sqlalchemy import select, func, and_, or_, case, literal, literal_column, cast, DateTime, Date, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -80,6 +80,16 @@ def _fix_mojibake(value: Optional[str]) -> str:
     except Exception:
         pass
     return s.replace("С‘", "ё").replace("Рµ", "е")
+
+
+def _to_mojibake(value: str) -> str:
+    s = (value or "").strip()
+    if not s:
+        return ""
+    try:
+        return s.encode("utf-8").decode("cp1251")
+    except Exception:
+        return s
 
 
 def _derived_category_expr():
@@ -188,6 +198,105 @@ def _effective_dt_expr():
     return func.coalesce(Transaction.date, cast(Transaction.operation_date, DateTime))
 
 
+def _text_match_conditions(column, query: str):
+    q = (query or "").strip()
+    if not q:
+        return None
+    variants = {q, q.lower(), q.upper(), q.capitalize(), q.title()}
+    like_conds = [column.ilike(f"%{v}%") for v in variants if v]
+    return or_(*like_conds) if like_conds else None
+
+
+def _non_empty_text_condition(column):
+    return func.nullif(func.trim(func.coalesce(column, "")), "").isnot(None)
+
+
+def _meaningful_transaction_condition():
+    return or_(
+        Transaction.date.isnot(None),
+        Transaction.operation_date.isnot(None),
+        func.coalesce(Transaction.amount_tenge, 0) > 0,
+        func.coalesce(Transaction.debit, 0) > 0,
+        func.coalesce(Transaction.credit, 0) > 0,
+        _non_empty_text_condition(Transaction.sender_name),
+        _non_empty_text_condition(Transaction.sender_account),
+        _non_empty_text_condition(Transaction.recipient_name),
+        _non_empty_text_condition(Transaction.recipient_account),
+        _non_empty_text_condition(Transaction.purpose),
+        _non_empty_text_condition(Transaction.currency),
+    )
+
+
+def _shared_filter_conditions(
+    *,
+    date: Optional[str],
+    date_from: Optional[str],
+    date_to: Optional[str],
+    category: Optional[str],
+    search: Optional[str],
+    min_amount: Optional[float],
+    max_amount: Optional[float],
+    currency: Optional[str],
+    sender: Optional[str],
+    recipient: Optional[str],
+):
+    conditions = [_meaningful_transaction_condition(), *_date_range_conditions(date_from, date_to)]
+
+    if date:
+        dt = _parse_date(date)
+        conditions.append(
+            or_(
+                cast(func.timezone("UTC", Transaction.date), Date) == dt.date(),
+                Transaction.operation_date == dt.date(),
+            )
+        )
+
+    if category:
+        category_q = category.strip()
+        category_mojibake = _to_mojibake(category_q)
+        category_expr = _derived_category_expr()
+        cond_main = _text_match_conditions(category_expr, category_q)
+        if cond_main is not None:
+            if category_mojibake and category_mojibake != category_q:
+                cond_moji = _text_match_conditions(category_expr, category_mojibake)
+                conditions.append(or_(cond_main, cond_moji) if cond_moji is not None else cond_main)
+            else:
+                conditions.append(cond_main)
+
+    if search:
+        search_cond = _text_match_conditions(Transaction.purpose, search)
+        if search_cond is not None:
+            conditions.append(search_cond)
+    if min_amount is not None:
+        conditions.append(Transaction.amount_tenge >= min_amount)
+    if max_amount is not None:
+        conditions.append(Transaction.amount_tenge <= max_amount)
+    if currency:
+        conditions.append(Transaction.currency == currency.upper())
+    if sender:
+        sender_q = sender.strip()
+        sender_name_cond = _text_match_conditions(Transaction.sender_name, sender_q)
+        sender_match_list = [
+            Transaction.sender_iin_bin.ilike(f"%{sender_q}%"),
+            Transaction.sender_account.ilike(f"%{sender_q}%"),
+        ]
+        if sender_name_cond is not None:
+            sender_match_list.insert(0, sender_name_cond)
+        conditions.append(or_(*sender_match_list))
+    if recipient:
+        recipient_q = recipient.strip()
+        recipient_name_cond = _text_match_conditions(Transaction.recipient_name, recipient_q)
+        recipient_match_list = [
+            Transaction.recipient_iin_bin.ilike(f"%{recipient_q}%"),
+            Transaction.recipient_account.ilike(f"%{recipient_q}%"),
+        ]
+        if recipient_name_cond is not None:
+            recipient_match_list.insert(0, recipient_name_cond)
+        conditions.append(or_(*recipient_match_list))
+
+    return conditions
+
+
 def _effective_dt_value(tx: Transaction) -> Optional[datetime]:
     if tx.date is not None:
         return tx.date
@@ -274,12 +383,31 @@ def _cash_deposit_condition():
 @router.get("/time-series", response_model=TimeSeriesResponse)
 async def time_series(
     period: str = Query("month", description="year | month | day"),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
-    conds = _date_range_conditions(date_from, date_to)
+    conds = _shared_filter_conditions(
+        date=date,
+        date_from=date_from,
+        date_to=date_to,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
     where = _project_where(ctx.project.project_id, *conds)
 
     # Group expression depends on period
@@ -335,6 +463,14 @@ async def time_series_transactions(
     period: str = Query("month", description="year | month | day"),
     bucket: str = Query(..., description="YYYY | YYYY-MM | YYYY-MM-DD"),
     limit: int = Query(200, ge=1, le=500),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -346,7 +482,22 @@ async def time_series_transactions(
     else:
         cond = (func.to_char(effective_dt, "YYYY-MM") == bucket)
 
-    where = _project_where(ctx.project.project_id, cond)
+    where = _project_where(
+        ctx.project.project_id,
+        cond,
+        *_shared_filter_conditions(
+            date=date,
+            date_from=None,
+            date_to=None,
+            category=category,
+            search=search,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            currency=currency,
+            sender=sender,
+            recipient=recipient,
+        ),
+    )
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
@@ -388,12 +539,31 @@ async def time_series_transactions(
 
 @router.get("/summary", response_model=AnalyticsSummaryResponse)
 async def analytics_summary(
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
-    conds = _date_range_conditions(date_from, date_to)
+    conds = _shared_filter_conditions(
+        date=date,
+        date_from=date_from,
+        date_to=date_to,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
     where = _project_where(ctx.project.project_id, *conds)
 
     q = select(
@@ -428,6 +598,14 @@ async def analytics_summary(
 async def top_expenses(
     type: str = Query("debit", description="debit | credit"),
     limit: int = Query(10, ge=1, le=100),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -444,6 +622,18 @@ async def top_expenses(
     display_name = _display_name_expr(group_name, group_acc)
     valid_display = and_(display_name.isnot(None), display_name != "")
 
+    shared_conds = _shared_filter_conditions(
+        date=date,
+        date_from=None,
+        date_to=None,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
     q = (
         select(
             display_name.label("cp_name"),
@@ -452,7 +642,7 @@ async def top_expenses(
             func.sum(amount_col).label("amount"),
             func.count(Transaction.id).label("tx_count"),
         )
-        .where(_project_where(ctx.project.project_id, amount_col > 0, valid_display))
+        .where(_project_where(ctx.project.project_id, amount_col > 0, valid_display, *shared_conds))
         .group_by(display_name, group_iin, group_acc)
         .order_by(func.sum(amount_col).desc())
         .limit(limit)
@@ -462,7 +652,7 @@ async def top_expenses(
 
     # grand total for percentage
     total_q = select(func.coalesce(func.sum(amount_col), 0)).where(
-        _project_where(ctx.project.project_id, amount_col > 0, valid_display)
+        _project_where(ctx.project.project_id, amount_col > 0, valid_display, *shared_conds)
     )
     grand_total = float((await db.execute(total_q)).scalar() or 0)
 
@@ -508,6 +698,14 @@ async def top_expenses_transactions(
     account: Optional[str] = Query(None),
     name: Optional[str] = Query(None),
     limit: int = Query(200, ge=1, le=500),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -536,7 +734,23 @@ async def top_expenses_transactions(
     else:
         cp_cond = (_display_name_expr(cp_name_col, cp_acc_col) == cp_name)
 
-    where = _project_where(ctx.project.project_id, amount_col > 0, cp_cond)
+    where = _project_where(
+        ctx.project.project_id,
+        amount_col > 0,
+        cp_cond,
+        *_shared_filter_conditions(
+            date=date,
+            date_from=None,
+            date_to=None,
+            category=category,
+            search=search,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            currency=currency,
+            sender=sender,
+            recipient=recipient,
+        ),
+    )
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
 
@@ -584,9 +798,29 @@ async def top_expenses_transactions(
 @router.get("/top-counterparties", response_model=TopCounterpartiesResponse)
 async def top_counterparties(
     limit: int = Query(10, ge=1, le=100),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
+    shared_conds = _shared_filter_conditions(
+        date=date,
+        date_from=None,
+        date_to=None,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
     sender_display = _display_name_expr(Transaction.sender_name, Transaction.sender_account)
     sender_iin = func.upper(func.coalesce(Transaction.sender_iin_bin, ""))
     sender_acc = _normalized_account_expr(Transaction.sender_account)
@@ -630,6 +864,7 @@ async def top_counterparties(
                 sender_display.isnot(None),
                 sender_display != "",
                 or_(sender_has_iin, sender_has_acc),
+                *shared_conds,
             )
         )
         .group_by(sender_key, sender_display, sender_iin_out, sender_account_out)
@@ -652,6 +887,7 @@ async def top_counterparties(
                 recipient_display.isnot(None),
                 recipient_display != "",
                 or_(recipient_has_iin, recipient_has_acc),
+                *shared_conds,
             )
         )
         .group_by(recipient_key, recipient_display, recipient_iin_out, recipient_account_out)
@@ -823,10 +1059,30 @@ async def counterparty_search(
 @router.get("/category-summary", response_model=CategorySummaryResponse)
 async def category_summary(
     limit: int = Query(24, ge=1, le=100),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
     category_expr = _derived_category_expr()
+    shared_conds = _shared_filter_conditions(
+        date=date,
+        date_from=None,
+        date_to=None,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
     q = (
         select(
             category_expr.label("category"),
@@ -835,7 +1091,7 @@ async def category_summary(
             func.coalesce(func.sum(Transaction.debit), 0).label("total_debit"),
             func.coalesce(func.sum(Transaction.credit), 0).label("total_credit"),
         )
-        .where(_project_where(ctx.project.project_id, category_expr.isnot(None)))
+        .where(_project_where(ctx.project.project_id, category_expr.isnot(None), *shared_conds))
         .group_by(category_expr)
         .order_by(func.count(Transaction.id).desc(), func.sum(Transaction.amount_tenge).desc())
         .limit(limit)
@@ -864,6 +1120,14 @@ async def category_summary(
 async def cash_top(
     type: str = Query("withdrawal", description="withdrawal | deposit"),
     limit: int = Query(10, ge=1, le=100),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -882,7 +1146,24 @@ async def cash_top(
 
     display_name = _display_name_expr(group_name, group_acc)
     valid_display = and_(display_name.isnot(None), display_name != "")
-    base_cond = _project_where(ctx.project.project_id, amount_col > 0, purpose_cond, valid_display)
+    base_cond = _project_where(
+        ctx.project.project_id,
+        amount_col > 0,
+        purpose_cond,
+        valid_display,
+        *_shared_filter_conditions(
+            date=date,
+            date_from=None,
+            date_to=None,
+            category=category,
+            search=search,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            currency=currency,
+            sender=sender,
+            recipient=recipient,
+        ),
+    )
 
     q = (
         select(
@@ -953,6 +1234,14 @@ async def cash_transactions(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
     account: Optional[str] = Query(None, description="Counterparty account"),
     limit: int = Query(100, ge=1, le=500),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -975,7 +1264,24 @@ async def cash_transactions(
             cp_cond = and_(cp_cond, cp_acc_col == account)
         purpose_cond = _cash_withdrawal_condition()
 
-    where = _project_where(ctx.project.project_id, amount_col > 0, purpose_cond, cp_cond)
+    where = _project_where(
+        ctx.project.project_id,
+        amount_col > 0,
+        purpose_cond,
+        cp_cond,
+        *_shared_filter_conditions(
+            date=date,
+            date_from=None,
+            date_to=None,
+            category=category,
+            search=search,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            currency=currency,
+            sender=sender,
+            recipient=recipient,
+        ),
+    )
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)
@@ -1026,6 +1332,14 @@ async def counterparty_transactions(
     iin_bin: str = Query(..., description="Counterparty IIN/BIN"),
     account: Optional[str] = Query(None, description="Counterparty account"),
     limit: int = Query(200, ge=1, le=500),
+    date: Optional[str] = Query(None, description="Exact date DD.MM.YYYY"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
     ctx: ProjectContext = Depends(get_current_project_context),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1041,7 +1355,22 @@ async def counterparty_transactions(
                 Transaction.recipient_account == account,
             ),
         )
-    where = _project_where(ctx.project.project_id, identity_cond)
+    where = _project_where(
+        ctx.project.project_id,
+        identity_cond,
+        *_shared_filter_conditions(
+            date=date,
+            date_from=None,
+            date_to=None,
+            category=category,
+            search=search,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            currency=currency,
+            sender=sender,
+            recipient=recipient,
+        ),
+    )
 
     total_q = select(func.count(Transaction.id)).where(where)
     total = int((await db.execute(total_q)).scalar() or 0)

@@ -60,6 +60,10 @@ _PROJECT_PARAM_PATTERNS = (
     re.compile(r"%\(\s*project_id\s*\)s", re.IGNORECASE),
     re.compile(r":project_id\b", re.IGNORECASE),
 )
+_UNSAFE_ALIAS_RE = re.compile(
+    r"\bAS\s+(?!\")(?P<alias>.+?)(?=(?:\s*,|\s+FROM\b|\s+WHERE\b|\s+GROUP\s+BY\b|\s+ORDER\s+BY\b|\s+LIMIT\b|\s+OFFSET\b|$))",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _inject_where_predicate(sql: str, predicate: str) -> str:
@@ -152,6 +156,19 @@ def _normalize_postgres_date_sql(sql: str) -> str:
         return f"{expr} >= '{year}-01-01' AND {expr} < '{next_year}-01-01'"
 
     return _YEAR_EQUALS_RE.sub(repl, sql)
+
+
+def _normalize_select_aliases(sql: str) -> str:
+    def repl(match: re.Match) -> str:
+        alias = " ".join(match.group("alias").strip().split())
+        if alias.startswith('"') and alias.endswith('"'):
+            return match.group(0)
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", alias):
+            return match.group(0)
+        escaped = alias.replace('"', '""')
+        return f'AS "{escaped}"'
+
+    return _UNSAFE_ALIAS_RE.sub(repl, sql)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -291,6 +308,7 @@ class QueryService:
             sql = _normalize_embedding_sql(sql, self.embedder.enabled)
             sql = _normalize_postgres_date_sql(sql)
             sql = _normalize_ranked_amount_sql(sql)
+            sql = _normalize_select_aliases(sql)
             log.info("Generated SQL:\n%s", sql)
 
             # 6. validate
@@ -436,6 +454,7 @@ class QueryService:
             sql = _normalize_embedding_sql(sql, self.embedder.enabled)
             sql = _normalize_postgres_date_sql(sql)
             sql = _normalize_ranked_amount_sql(sql)
+            sql = _normalize_select_aliases(sql)
             
             yield {"event": "sql", "data": sql}
             validate_sql(sql)
@@ -519,6 +538,7 @@ class QueryService:
         repaired_sql = _normalize_embedding_sql(repaired_sql, self.embedder.enabled)
         repaired_sql = _normalize_postgres_date_sql(repaired_sql)
         repaired_sql = _normalize_ranked_amount_sql(repaired_sql)
+        repaired_sql = _normalize_select_aliases(repaired_sql)
         validate_sql(repaired_sql)
         def _execute():
             return self.executor.execute(

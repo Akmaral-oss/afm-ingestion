@@ -20,7 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, Query, File, UploadFile, Header, HTTPException, status, Form
 from fastapi.responses import StreamingResponse
 from openpyxl import load_workbook, Workbook
-from sqlalchemy import select, func, and_, or_, case, text
+from sqlalchemy import select, func, and_, or_, case, text, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -1097,9 +1097,12 @@ def _build_transaction_where_clause(
     ]
     if date:
         dt = _parse_date(date)
-        day_start = dt.replace(hour=0, minute=0, second=0)
-        day_end = dt.replace(hour=23, minute=59, second=59)
-        conditions.append(Transaction.date.between(day_start, day_end))
+        conditions.append(
+            or_(
+                cast(func.timezone("UTC", Transaction.date), Date) == dt.date(),
+                Transaction.operation_date == dt.date(),
+            )
+        )
 
     if category:
         category_q = category.strip()
