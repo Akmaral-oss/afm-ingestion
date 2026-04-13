@@ -1,4 +1,4 @@
-﻿"""
+"""
 Analytics endpoints:
   GET /api/v1/analytics/time-series
   GET /api/v1/analytics/summary
