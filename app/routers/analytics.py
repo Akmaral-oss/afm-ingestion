@@ -40,6 +40,11 @@ from ..schemas import (
     CounterpartyGraphEdge,
     CategorySummaryResponse,
     CategorySummaryItem,
+    ComparePeriodSummary,
+    ComparePeriodDelta,
+    ComparePeriodMetric,
+    ComparePeriodCategoryItem,
+    ComparePeriodsResponse,
 )
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
@@ -312,6 +317,225 @@ def _format_tx_dt(tx: Transaction) -> str:
 
 def _project_where(project_id: str, *conds):
     return and_(Transaction.project_id == project_id, *conds)
+
+
+def _safe_delta_percent(value_a: float, value_b: float) -> Optional[float]:
+    if abs(value_a) < 1e-9:
+        return 0.0 if abs(value_b) < 1e-9 else None
+    return round(((value_b - value_a) / value_a) * 100, 2)
+
+
+async def _count_unique_counterparties(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    shared_conds: list,
+) -> int:
+    sender_display = _display_name_expr(Transaction.sender_name, Transaction.sender_account)
+    sender_iin = func.upper(func.coalesce(Transaction.sender_iin_bin, ""))
+    sender_acc = _normalized_account_expr(Transaction.sender_account)
+    sender_has_iin = and_(sender_iin != "", sender_iin != "0", sender_iin != "000000000000")
+    sender_has_acc = sender_acc != ""
+    sender_key = case(
+        (sender_has_iin, literal("iin:") + sender_iin),
+        (sender_has_acc, literal("acc:") + sender_acc),
+        else_=literal("name:") + sender_display,
+    )
+
+    recipient_display = _display_name_expr(Transaction.recipient_name, Transaction.recipient_account)
+    recipient_iin = func.upper(func.coalesce(Transaction.recipient_iin_bin, ""))
+    recipient_acc = _normalized_account_expr(Transaction.recipient_account)
+    recipient_has_iin = and_(recipient_iin != "", recipient_iin != "0", recipient_iin != "000000000000")
+    recipient_has_acc = recipient_acc != ""
+    recipient_key = case(
+        (recipient_has_iin, literal("iin:") + recipient_iin),
+        (recipient_has_acc, literal("acc:") + recipient_acc),
+        else_=literal("name:") + recipient_display,
+    )
+
+    sender_side = (
+        select(sender_key.label("cp_key"))
+        .where(
+            _project_where(
+                project_id,
+                sender_display.isnot(None),
+                sender_display != "",
+                *shared_conds,
+            )
+        )
+    )
+    recipient_side = (
+        select(recipient_key.label("cp_key"))
+        .where(
+            _project_where(
+                project_id,
+                recipient_display.isnot(None),
+                recipient_display != "",
+                *shared_conds,
+            )
+        )
+    )
+
+    combined = union_all(sender_side, recipient_side).subquery()
+    q = select(func.count(func.distinct(combined.c.cp_key)))
+    return int((await db.execute(q)).scalar() or 0)
+
+
+async def _build_compare_summary(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    shared_conds: list,
+) -> ComparePeriodSummary:
+    row = (
+        await db.execute(
+            select(
+                func.coalesce(func.sum(Transaction.credit), 0).label("total_credit"),
+                func.coalesce(func.sum(Transaction.debit), 0).label("total_debit"),
+                func.count(Transaction.id).label("total_transactions"),
+            ).where(_project_where(project_id, *shared_conds))
+        )
+    ).one()
+
+    unique_counterparties = await _count_unique_counterparties(
+        db,
+        project_id=project_id,
+        shared_conds=shared_conds,
+    )
+
+    return ComparePeriodSummary(
+        total_debit=float(row.total_debit or 0),
+        total_credit=float(row.total_credit or 0),
+        total_transactions=int(row.total_transactions or 0),
+        unique_counterparties=unique_counterparties,
+    )
+
+
+async def _build_compare_categories(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    shared_conds_a: list,
+    shared_conds_b: list,
+    limit: int,
+) -> list[ComparePeriodCategoryItem]:
+    category_expr = _derived_category_expr()
+
+    async def fetch_rows(shared_conds: list):
+        query = (
+            select(
+                category_expr.label("category"),
+                func.count(Transaction.id).label("tx_count"),
+                func.coalesce(func.sum(Transaction.amount_tenge), 0).label("turnover"),
+            )
+            .where(_project_where(project_id, category_expr.isnot(None), *shared_conds))
+            .group_by(category_expr)
+        )
+        return (await db.execute(query)).all()
+
+    rows_a = await fetch_rows(shared_conds_a)
+    rows_b = await fetch_rows(shared_conds_b)
+
+    merged: dict[str, dict] = {}
+
+    for row in rows_a:
+        category = _fix_mojibake((row.category or "").strip())
+        if not category:
+            continue
+        merged.setdefault(
+            category,
+            {"value_a": 0.0, "value_b": 0.0, "tx_a": 0, "tx_b": 0},
+        )
+        merged[category]["value_a"] += float(row.turnover or 0)
+        merged[category]["tx_a"] += int(row.tx_count or 0)
+
+    for row in rows_b:
+        category = _fix_mojibake((row.category or "").strip())
+        if not category:
+            continue
+        merged.setdefault(
+            category,
+            {"value_a": 0.0, "value_b": 0.0, "tx_a": 0, "tx_b": 0},
+        )
+        merged[category]["value_b"] += float(row.turnover or 0)
+        merged[category]["tx_b"] += int(row.tx_count or 0)
+
+    items = [
+        ComparePeriodCategoryItem(
+            category=category,
+            value_a=values["value_a"],
+            value_b=values["value_b"],
+            delta=values["value_b"] - values["value_a"],
+            delta_percent=_safe_delta_percent(values["value_a"], values["value_b"]),
+            transaction_count_a=values["tx_a"],
+            transaction_count_b=values["tx_b"],
+        )
+        for category, values in merged.items()
+    ]
+
+    items.sort(key=lambda item: (abs(item.delta), item.value_b, item.value_a), reverse=True)
+    return items[:limit]
+
+
+def _build_compare_metrics(
+    summary_a: ComparePeriodSummary,
+    summary_b: ComparePeriodSummary,
+) -> list[ComparePeriodMetric]:
+    metric_specs = [
+        ("Общий дебет", float(summary_a.total_debit), float(summary_b.total_debit)),
+        ("Общий кредит", float(summary_a.total_credit), float(summary_b.total_credit)),
+        ("Кол-во транзакций", float(summary_a.total_transactions), float(summary_b.total_transactions)),
+        ("Уникальные контрагенты", float(summary_a.unique_counterparties), float(summary_b.unique_counterparties)),
+    ]
+
+    return [
+        ComparePeriodMetric(
+            label=label,
+            value_a=value_a,
+            value_b=value_b,
+            delta=ComparePeriodDelta(
+                absolute=value_b - value_a,
+                percent=_safe_delta_percent(value_a, value_b),
+            ),
+        )
+        for label, value_a, value_b in metric_specs
+    ]
+
+
+def _build_compare_anomalies(
+    summary_a: ComparePeriodSummary,
+    summary_b: ComparePeriodSummary,
+    categories: list[ComparePeriodCategoryItem],
+) -> list[str]:
+    anomalies: list[str] = []
+
+    debit_pct = _safe_delta_percent(summary_a.total_debit, summary_b.total_debit)
+    if debit_pct is not None and debit_pct >= 50:
+        anomalies.append(f"Расходы выросли на {round(debit_pct)}% в периоде B.")
+
+    tx_pct = _safe_delta_percent(float(summary_a.total_transactions), float(summary_b.total_transactions))
+    if tx_pct is not None and tx_pct >= 30:
+        anomalies.append(f"Количество транзакций выросло на {round(tx_pct)}%.")
+
+    unique_delta = summary_b.unique_counterparties - summary_a.unique_counterparties
+    if unique_delta >= 5:
+        anomalies.append(f"Появилось {unique_delta} дополнительных уникальных контрагентов.")
+
+    cash_row = next((item for item in categories if item.category == "Снятие наличных"), None)
+    if cash_row and cash_row.delta_percent is not None and cash_row.delta_percent >= 100:
+        anomalies.append(f"Снятие наличных выросло на {round(cash_row.delta_percent)}%.")
+
+    new_category = next(
+        (
+            item for item in categories
+            if item.value_a <= 0 and item.value_b > 0
+        ),
+        None,
+    )
+    if new_category:
+        anomalies.append(f"В периоде B появилась новая заметная категория: {new_category.category}.")
+
+    return anomalies[:4]
 
 
 def _cash_withdrawal_condition():
@@ -587,6 +811,84 @@ async def analytics_summary(
         total_turnover=total_credit + total_debit,
         total_transactions=row.total_transactions,
         period=PeriodRange(from_=period_from, to=period_to),
+    )
+
+
+@router.get("/compare-periods", response_model=ComparePeriodsResponse)
+async def compare_periods(
+    date_from_a: str = Query(..., description="Start date for period A in DD.MM.YYYY"),
+    date_to_a: str = Query(..., description="End date for period A in DD.MM.YYYY"),
+    date_from_b: str = Query(..., description="Start date for period B in DD.MM.YYYY"),
+    date_to_b: str = Query(..., description="End date for period B in DD.MM.YYYY"),
+    limit: int = Query(20, ge=1, le=100),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
+    ctx: ProjectContext = Depends(get_current_project_context),
+    db: AsyncSession = Depends(get_db),
+):
+    if _parse_date(date_from_a) > _parse_date(date_to_a):
+        raise HTTPException(status_code=422, detail="date_from_a must be <= date_to_a")
+    if _parse_date(date_from_b) > _parse_date(date_to_b):
+        raise HTTPException(status_code=422, detail="date_from_b must be <= date_to_b")
+
+    shared_conds_a = _shared_filter_conditions(
+        date=None,
+        date_from=date_from_a,
+        date_to=date_to_a,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
+    shared_conds_b = _shared_filter_conditions(
+        date=None,
+        date_from=date_from_b,
+        date_to=date_to_b,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
+
+    summary_a = await _build_compare_summary(
+        db,
+        project_id=ctx.project.project_id,
+        shared_conds=shared_conds_a,
+    )
+    summary_b = await _build_compare_summary(
+        db,
+        project_id=ctx.project.project_id,
+        shared_conds=shared_conds_b,
+    )
+    categories = await _build_compare_categories(
+        db,
+        project_id=ctx.project.project_id,
+        shared_conds_a=shared_conds_a,
+        shared_conds_b=shared_conds_b,
+        limit=limit,
+    )
+    metrics = _build_compare_metrics(summary_a, summary_b)
+    anomalies = _build_compare_anomalies(summary_a, summary_b, categories)
+
+    return ComparePeriodsResponse(
+        period_a=PeriodRange(from_=date_from_a, to=date_to_a),
+        period_b=PeriodRange(from_=date_from_b, to=date_to_b),
+        summary_a=summary_a,
+        summary_b=summary_b,
+        metrics=metrics,
+        categories=categories,
+        anomalies=anomalies,
     )
 
 

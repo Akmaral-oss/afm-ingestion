@@ -307,6 +307,45 @@ class CategorySummaryResponse(BaseModel):
     data: list[CategorySummaryItem]
 
 
+class ComparePeriodSummary(BaseModel):
+    total_debit: float
+    total_credit: float
+    total_transactions: int
+    unique_counterparties: int
+
+
+class ComparePeriodDelta(BaseModel):
+    absolute: float
+    percent: Optional[float] = None
+
+
+class ComparePeriodMetric(BaseModel):
+    label: str
+    value_a: float
+    value_b: float
+    delta: ComparePeriodDelta
+
+
+class ComparePeriodCategoryItem(BaseModel):
+    category: str
+    value_a: float
+    value_b: float
+    delta: float
+    delta_percent: Optional[float] = None
+    transaction_count_a: int
+    transaction_count_b: int
+
+
+class ComparePeriodsResponse(BaseModel):
+    period_a: PeriodRange
+    period_b: PeriodRange
+    summary_a: ComparePeriodSummary
+    summary_b: ComparePeriodSummary
+    metrics: list[ComparePeriodMetric]
+    categories: list[ComparePeriodCategoryItem]
+    anomalies: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Chat / NL2SQL
 # ---------------------------------------------------------------------------
