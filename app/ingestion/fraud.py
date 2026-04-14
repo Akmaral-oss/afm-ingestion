@@ -193,6 +193,153 @@ def detect_import_fraud_warnings(rows: Iterable[ImportedTransactionSample]) -> l
             )
         )
 
+    repeated_amount_groups = _repeated_amount_groups(txs)
+    repeated_amount_txs = [tx for group in repeated_amount_groups for tx in group["txs"]]
+    repeated_amount_share = len({tx.tx_id for tx in repeated_amount_txs}) / len(txs) if txs else 0.0
+    if repeated_amount_groups and repeated_amount_share >= 0.25:
+        top_amount_group = repeated_amount_groups[0]
+        warnings.append(
+            ImportFraudWarning(
+                code="repeated_amount_patterns",
+                title="\u041f\u043e\u0432\u0442\u043e\u0440\u044f\u044e\u0449\u0438\u0435\u0441\u044f \u0441\u0443\u043c\u043c\u044b \u0438 \u0448\u0430\u0431\u043b\u043e\u043d\u043d\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b",
+                severity="medium",
+                summary=(
+                    "\u0412 \u0432\u044b\u043f\u0438\u0441\u043a\u0435 \u043c\u043d\u043e\u0433\u043e \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439 \u0441 \u043e\u0434\u0438\u043d\u0430\u043a\u043e\u0432\u044b\u043c\u0438 \u0438\u043b\u0438 \u043e\u0447\u0435\u043d\u044c \u0431\u043b\u0438\u0437\u043a\u0438\u043c\u0438 \u0441\u0443\u043c\u043c\u0430\u043c\u0438. "
+                    "\u042d\u0442\u043e \u043f\u043e\u0445\u043e\u0436\u0435 \u043d\u0430 \u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u0443\u044e \u0441\u0445\u0435\u043c\u0443 \u0441 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u044e\u0449\u0438\u043c\u0438\u0441\u044f \u043d\u043e\u043c\u0438\u043d\u0430\u043b\u0430\u043c\u0438."
+                ),
+                articles=("\u0441\u0442. 190 \u0423\u041a \u0420\u041a", "\u0441\u0442. 218 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u041f\u043e\u0432\u0442\u043e\u0440\u044f\u044e\u0449\u0438\u0445\u0441\u044f \u043d\u043e\u043c\u0438\u043d\u0430\u043b\u043e\u0432", str(len(repeated_amount_groups))),
+                    ImportFraudIndicator("\u0421\u0430\u043c\u044b\u0439 \u0447\u0430\u0441\u0442\u044b\u0439 \u043d\u043e\u043c\u0438\u043d\u0430\u043b", _format_money(top_amount_group["amount"])),
+                    ImportFraudIndicator("\u041f\u043e\u0432\u0442\u043e\u0440\u043e\u0432 \u043f\u043e \u043d\u043e\u043c\u0438\u043d\u0430\u043b\u0443", str(top_amount_group["count"])),
+                    ImportFraudIndicator("\u0414\u043e\u043b\u044f \u0448\u0430\u0431\u043b\u043e\u043d\u043d\u044b\u0445 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439", _format_percent(repeated_amount_share)),
+                ),
+                counterparties=tuple(_top_counterparties(repeated_amount_txs, payer=_credit_amount(repeated_amount_txs[0]) > 0, role="\u041a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442", limit=6)),
+                sample_transactions=tuple(_sample_transactions(_top_by_amount(repeated_amount_txs, _amount_abs, 8), limit=8)),
+            )
+        )
+
+    high_activity_days = _high_activity_days(txs)
+    if high_activity_days:
+        day_stats = high_activity_days[0]
+        warnings.append(
+            ImportFraudWarning(
+                code="high_activity_spike",
+                title="\u041d\u0435\u043e\u0431\u044b\u0447\u043d\u043e \u0432\u044b\u0441\u043e\u043a\u0430\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c \u0437\u0430 \u043a\u043e\u0440\u043e\u0442\u043a\u0438\u0439 \u0441\u0440\u043e\u043a",
+                severity="medium",
+                summary=(
+                    "\u0412 \u043e\u0434\u0438\u043d \u0438\u0437 \u0434\u043d\u0435\u0439 \u0432 \u0432\u044b\u043f\u0438\u0441\u043a\u0435 \u0437\u0430\u0444\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d \u0441\u043a\u0430\u0447\u043e\u043a \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438: \u043c\u043d\u043e\u0433\u043e \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439 \u0438 \u0432\u044b\u0441\u043e\u043a\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442 "
+                    "\u0437\u0430 \u043e\u0447\u0435\u043d\u044c \u043a\u043e\u0440\u043e\u0442\u043a\u043e\u0435 \u0432\u0440\u0435\u043c\u044f."
+                ),
+                articles=("\u0441\u0442. 232-1 \u0423\u041a \u0420\u041a", "\u0441\u0442. 218 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u0414\u0430\u0442\u0430 \u043f\u0438\u043a\u0430", day_stats["day"].strftime("%d.%m.%Y")),
+                    ImportFraudIndicator("\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u0439 \u0437\u0430 \u0434\u0435\u043d\u044c", str(day_stats["count"])),
+                    ImportFraudIndicator("\u041e\u0431\u043e\u0440\u043e\u0442 \u0437\u0430 \u0434\u0435\u043d\u044c", _format_money(day_stats["turnover"])),
+                    ImportFraudIndicator("\u0420\u0430\u0437\u043d\u044b\u0445 \u043a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442\u043e\u0432", str(day_stats["distinct_counterparties"])),
+                ),
+                counterparties=tuple(_top_counterparties(day_stats["txs"], payer=_credit_amount(day_stats["txs"][0]) > 0, role="\u041a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442", limit=6)),
+                sample_transactions=tuple(_sample_transactions(day_stats["txs"], limit=8)),
+            )
+        )
+
+    repeated_counterparties = _repeated_counterparty_relationships(txs)
+    if repeated_counterparties:
+        top_cp = repeated_counterparties[0]
+        warnings.append(
+            ImportFraudWarning(
+                code="repeated_counterparty_flows",
+                title="\u0427\u0430\u0441\u0442\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u043c\u0435\u0436\u0434\u0443 \u043e\u0434\u043d\u0438\u043c\u0438 \u0438 \u0442\u0435\u043c\u0438 \u0436\u0435 \u043b\u0438\u0446\u0430\u043c\u0438",
+                severity="medium",
+                summary=(
+                    "\u041e\u0434\u0438\u043d \u0438 \u0442\u043e\u0442 \u0436\u0435 \u043a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u0442\u0441\u044f \u0432 \u0431\u043e\u043b\u044c\u0448\u043e\u043c \u0447\u0438\u0441\u043b\u0435 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439. "
+                    "\u0420\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u044b\u0439 \u043e\u0431\u043c\u0435\u043d \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430\u043c\u0438 \u0431\u0435\u0437 \u044f\u0441\u043d\u043e\u0439 \u044d\u043a\u043e\u043d\u043e\u043c\u0438\u0447\u0435\u0441\u043a\u043e\u0439 \u043b\u043e\u0433\u0438\u043a\u0438 \u043c\u043e\u0436\u0435\u0442 \u0443\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u043d\u0430 \u043e\u0431\u043d\u0430\u043b\u0438\u0447\u0438\u0432\u0430\u043d\u0438\u0435 \u0438\u043b\u0438 \u0442\u0440\u0430\u043d\u0437\u0438\u0442."
+                ),
+                articles=("\u0441\u0442. 190 \u0423\u041a \u0420\u041a", "\u0441\u0442. 232-1 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u041a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442", top_cp["name"]),
+                    ImportFraudIndicator("\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u0439 \u0441 \u043d\u0438\u043c", str(top_cp["count"])),
+                    ImportFraudIndicator("\u041e\u0431\u043e\u0440\u043e\u0442", _format_money(top_cp["turnover"])),
+                    ImportFraudIndicator("\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0434\u043d\u0435\u0439", str(top_cp["days"])),
+                ),
+                counterparties=tuple(_relationship_counterparties(repeated_counterparties[:6])),
+                sample_transactions=tuple(_sample_transactions(top_cp["txs"], limit=8)),
+            )
+        )
+
+    fan_in_targets = _fan_in_targets(credit_txs)
+    if fan_in_targets:
+        top_target = fan_in_targets[0]
+        warnings.append(
+            ImportFraudWarning(
+                code="fan_in_drop_account",
+                title="\u041c\u043d\u043e\u0433\u043e \u043f\u043e\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u0439 \u043e\u0442 \u0440\u0430\u0437\u043d\u044b\u0445 \u043b\u0438\u0446 \u043d\u0430 \u043e\u0434\u0438\u043d \u0441\u0447\u0451\u0442",
+                severity="high",
+                summary=(
+                    "\u041e\u0434\u0438\u043d \u0441\u0447\u0451\u0442 \u0430\u043a\u043a\u0443\u043c\u0443\u043b\u0438\u0440\u0443\u0435\u0442 \u043f\u043e\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u044f \u043e\u0442 \u043c\u043d\u043e\u0436\u0435\u0441\u0442\u0432\u0430 \u0440\u0430\u0437\u043d\u044b\u0445 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u0435\u0439. "
+                    "\u042d\u0442\u043e \u043f\u043e\u0445\u043e\u0436\u0435 \u043d\u0430 \u043f\u043e\u0432\u0435\u0434\u0435\u043d\u0438\u0435 \u201c\u0434\u0440\u043e\u043f-\u0441\u0447\u0451\u0442\u0430\u201d \u0438\u043b\u0438 \u0442\u0440\u0430\u043d\u0437\u0438\u0442\u043d\u043e\u0439 \u0442\u043e\u0447\u043a\u0438 \u0441\u0431\u043e\u0440\u0430 \u0434\u0435\u043d\u0435\u0433."
+                ),
+                articles=("\u0441\u0442. 232-1 \u0423\u041a \u0420\u041a", "\u0441\u0442. 218 \u0423\u041a \u0420\u041a", "\u0441\u0442. 190 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u041f\u043e\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u0439", str(top_target["count"])),
+                    ImportFraudIndicator("\u0420\u0430\u0437\u043d\u044b\u0445 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u0435\u0439", str(top_target["distinct_senders"])),
+                    ImportFraudIndicator("\u0421\u0443\u043c\u043c\u0430 \u0441\u0431\u043e\u0440\u0430", _format_money(top_target["turnover"])),
+                    ImportFraudIndicator("\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0434\u043d\u0435\u0439", str(top_target["days"])),
+                ),
+                counterparties=tuple(_top_counterparties(top_target["txs"], payer=True, role="\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u044c", limit=6)),
+                sample_transactions=tuple(_sample_transactions(top_target["txs"], limit=8)),
+            )
+        )
+
+    rapid_outflow_patterns = _rapid_outflow_days(credit_txs, debit_txs)
+    if rapid_outflow_patterns:
+        top_rapid = rapid_outflow_patterns[0]
+        warnings.append(
+            ImportFraudWarning(
+                code="rapid_balance_flush",
+                title="\u041e\u0431\u043d\u0443\u043b\u0435\u043d\u0438\u0435 \u0431\u0430\u043b\u0430\u043d\u0441\u0430 \u0441\u0440\u0430\u0437\u0443 \u043f\u043e\u0441\u043b\u0435 \u043f\u043e\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u0439",
+                severity="high",
+                summary=(
+                    "\u0414\u0435\u043d\u044c\u0433\u0438 \u043f\u043e\u0441\u0442\u0443\u043f\u0430\u044e\u0442 \u0438 \u043f\u043e\u0447\u0442\u0438 \u0441\u0440\u0430\u0437\u0443 \u0443\u0445\u043e\u0434\u044f\u0442 \u0434\u0430\u043b\u044c\u0448\u0435. "
+                    "\u0422\u0430\u043a\u043e\u0439 \u0431\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0431\u043e\u0440\u043e\u0442 \u043f\u043e\u0445\u043e\u0436 \u043d\u0430 \u0442\u0440\u0430\u043d\u0437\u0438\u0442 \u0438\u043b\u0438 \u0441\u043a\u0440\u044b\u0442\u0438\u0435 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0430 \u043f\u0440\u043e\u0438\u0441\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u044f \u0441\u0440\u0435\u0434\u0441\u0442\u0432."
+                ),
+                articles=("\u0441\u0442. 232-1 \u0423\u041a \u0420\u041a", "\u0441\u0442. 218 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u0414\u0430\u0442\u0430", top_rapid["day"].strftime("%d.%m.%Y")),
+                    ImportFraudIndicator("\u0412\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442", _format_money(top_rapid["credit_total"])),
+                    ImportFraudIndicator("\u0418\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442", _format_money(top_rapid["debit_total"])),
+                    ImportFraudIndicator("\u0412\u044b\u0432\u0435\u0434\u0435\u043d\u043e \u0432 \u0442\u043e\u0442 \u0436\u0435 \u0434\u0435\u043d\u044c", _format_percent(top_rapid["ratio"])),
+                ),
+                counterparties=tuple(
+                    _top_counterparties(top_rapid["credits"], payer=True, role="\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u0435\u043b\u044c", limit=3)
+                    + _top_counterparties(top_rapid["debits"], payer=False, role="\u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c", limit=3)
+                ),
+                sample_transactions=tuple(_sample_transactions(top_rapid["credits"] + top_rapid["debits"], limit=8)),
+            )
+        )
+
+    purpose_mismatch_txs = _purpose_mismatch_transactions(txs)
+    if len(purpose_mismatch_txs) >= 3:
+        warnings.append(
+            ImportFraudWarning(
+                code="purpose_mismatch",
+                title="\u041d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0430 \u043d\u0435 \u0441\u043e\u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u043f\u043e\u0432\u0435\u0434\u0435\u043d\u0438\u044e \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439",
+                severity="medium",
+                summary=(
+                    "\u0412 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044f\u0445 \u0432\u0441\u0442\u0440\u0435\u0447\u0430\u044e\u0442\u0441\u044f \u00ab\u043b\u0438\u0447\u043d\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b\u00bb \u0438\u043b\u0438 \u0441\u0445\u043e\u0436\u0438\u0435 \u043d\u0435\u0439\u0442\u0440\u0430\u043b\u044c\u043d\u044b\u0435 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044f, "
+                    "\u043d\u043e \u0441\u0443\u043c\u043c\u044b \u0438 \u0447\u0430\u0441\u0442\u043e\u0442\u0430 \u043f\u043e\u0445\u043e\u0436\u0438 \u043d\u0430 \u043a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0443\u044e \u0438\u043b\u0438 \u0442\u0440\u0430\u043d\u0437\u0438\u0442\u043d\u0443\u044e \u0441\u0445\u0435\u043c\u0443."
+                ),
+                articles=("\u0441\u0442. 190 \u0423\u041a \u0420\u041a", "\u0441\u0442. 232-1 \u0423\u041a \u0420\u041a"),
+                indicators=(
+                    ImportFraudIndicator("\u041f\u043e\u0434\u043e\u0437\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0445 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0439", str(len(purpose_mismatch_txs))),
+                    ImportFraudIndicator("\u0421\u0430\u043c\u0430\u044f \u043a\u0440\u0443\u043f\u043d\u0430\u044f \u0441\u0443\u043c\u043c\u0430", _format_money(max(_amount_abs(tx) for tx in purpose_mismatch_txs))),
+                    ImportFraudIndicator("\u0420\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u043e\u0441\u0442\u044c \u043f\u0430\u0442\u0442\u0435\u0440\u043d\u0430", _format_percent(len(purpose_mismatch_txs) / len(txs))),
+                ),
+                counterparties=tuple(_top_counterparties(purpose_mismatch_txs, payer=_credit_amount(purpose_mismatch_txs[0]) > 0, role="\u041a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442", limit=6)),
+                sample_transactions=tuple(_sample_transactions(_top_by_amount(purpose_mismatch_txs, _amount_abs, 8), limit=8)),
+            )
+        )
+
     return [_enrich_warning_counterparties(warning) for warning in warnings]
 
 
@@ -432,3 +579,175 @@ def _format_money(value: float) -> str:
 
 def _format_percent(value: float) -> str:
     return f"{value * 100:.0f}%"
+
+
+def _repeated_amount_groups(txs: list[ImportedTransactionSample]) -> list[dict]:
+    groups: dict[tuple[str, float], list[ImportedTransactionSample]] = defaultdict(list)
+    for tx in txs:
+        amount = round(_amount_abs(tx), 2)
+        if amount <= 0:
+            continue
+        direction = "credit" if _credit_amount(tx) > 0 else "debit"
+        groups[(direction, amount)].append(tx)
+
+    result = []
+    for (_, amount), grouped_txs in groups.items():
+        if len(grouped_txs) < 4:
+            continue
+        result.append({
+            "amount": amount,
+            "count": len(grouped_txs),
+            "txs": sorted(grouped_txs, key=_tx_dt_sort_key, reverse=True),
+        })
+    return sorted(result, key=lambda item: (item["count"], item["amount"]), reverse=True)
+
+
+def _high_activity_days(txs: list[ImportedTransactionSample]) -> list[dict]:
+    by_day: dict[date, list[ImportedTransactionSample]] = defaultdict(list)
+    for tx in txs:
+        tx_day = _tx_day(tx)
+        if tx_day is not None:
+            by_day[tx_day].append(tx)
+
+    result = []
+    for tx_day, day_txs in by_day.items():
+        if len(day_txs) < 10:
+            continue
+        counterparties = {
+            _counterparty_key_for_tx(tx, payer=_credit_amount(tx) > 0)
+            for tx in day_txs
+            if _counterparty_key_for_tx(tx, payer=_credit_amount(tx) > 0)
+        }
+        result.append({
+            "day": tx_day,
+            "count": len(day_txs),
+            "turnover": sum(_amount_abs(tx) for tx in day_txs),
+            "distinct_counterparties": len(counterparties),
+            "txs": sorted(day_txs, key=_tx_dt_sort_key, reverse=True),
+        })
+    return sorted(result, key=lambda item: (item["count"], item["turnover"]), reverse=True)
+
+
+def _repeated_counterparty_relationships(txs: list[ImportedTransactionSample]) -> list[dict]:
+    stats: dict[str, dict] = defaultdict(lambda: {"name": "", "identifier": "", "count": 0, "turnover": 0.0, "days": set(), "txs": []})
+    for tx in txs:
+        is_credit = _credit_amount(tx) > 0
+        key = _counterparty_key_for_tx(tx, payer=is_credit)
+        if not key:
+            continue
+        stats[key]["name"] = stats[key]["name"] or _counterparty_label(tx, payer=is_credit)
+        stats[key]["identifier"] = stats[key]["identifier"] or _counterparty_identifier(tx, payer=is_credit)
+        stats[key]["count"] += 1
+        stats[key]["turnover"] += _amount_abs(tx)
+        tx_day = _tx_day(tx)
+        if tx_day is not None:
+            stats[key]["days"].add(tx_day)
+        stats[key]["txs"].append(tx)
+
+    result = []
+    for item in stats.values():
+        if item["count"] < 4 or item["turnover"] < 500_000:
+            continue
+        result.append({
+            "name": item["name"] or "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d",
+            "identifier": item["identifier"] or "\u2014",
+            "count": item["count"],
+            "turnover": item["turnover"],
+            "days": len(item["days"]),
+            "txs": sorted(item["txs"], key=_tx_dt_sort_key, reverse=True),
+        })
+    return sorted(result, key=lambda item: (item["count"], item["turnover"]), reverse=True)
+
+
+def _relationship_counterparties(items: list[dict]) -> list[ImportFraudCounterparty]:
+    return [
+        ImportFraudCounterparty(
+            role="\u041a\u043e\u043d\u0442\u0440\u0430\u0433\u0435\u043d\u0442",
+            name=item["name"],
+            identifier=item["identifier"],
+            transaction_count=int(item["count"]),
+            turnover=_format_money(float(item["turnover"])),
+        )
+        for item in items
+    ]
+
+
+def _fan_in_targets(credit_txs: list[ImportedTransactionSample]) -> list[dict]:
+    if not credit_txs:
+        return []
+
+    senders = {
+        _counterparty_key_for_tx(tx, payer=True)
+        for tx in credit_txs
+        if _counterparty_key_for_tx(tx, payer=True)
+    }
+    if len(senders) < 5 or len(credit_txs) < 8:
+        return []
+
+    return [{
+        "count": len(credit_txs),
+        "distinct_senders": len(senders),
+        "turnover": sum(_credit_amount(tx) for tx in credit_txs),
+        "days": len({_tx_day(tx) for tx in credit_txs if _tx_day(tx) is not None}),
+        "txs": sorted(credit_txs, key=_tx_dt_sort_key, reverse=True),
+    }]
+
+
+def _rapid_outflow_days(
+    credit_txs: list[ImportedTransactionSample],
+    debit_txs: list[ImportedTransactionSample],
+) -> list[dict]:
+    credits_by_day: dict[date, list[ImportedTransactionSample]] = defaultdict(list)
+    debits_by_day: dict[date, list[ImportedTransactionSample]] = defaultdict(list)
+    for tx in credit_txs:
+        tx_day = _tx_day(tx)
+        if tx_day is not None:
+            credits_by_day[tx_day].append(tx)
+    for tx in debit_txs:
+        tx_day = _tx_day(tx)
+        if tx_day is not None:
+            debits_by_day[tx_day].append(tx)
+
+    result = []
+    for tx_day, day_credits in credits_by_day.items():
+        day_debits = debits_by_day.get(tx_day, [])
+        if not day_debits:
+            continue
+        credit_total = sum(_credit_amount(tx) for tx in day_credits)
+        debit_total = sum(_debit_amount(tx) for tx in day_debits)
+        if credit_total < 300_000 or debit_total < 200_000:
+            continue
+        ratio = debit_total / credit_total if credit_total > 0 else 0.0
+        if ratio < 0.80:
+            continue
+        result.append({
+            "day": tx_day,
+            "credit_total": credit_total,
+            "debit_total": debit_total,
+            "ratio": ratio,
+            "credits": sorted(day_credits, key=_tx_dt_sort_key, reverse=True),
+            "debits": sorted(day_debits, key=_tx_dt_sort_key, reverse=True),
+        })
+    return sorted(result, key=lambda item: (item["ratio"], item["debit_total"]), reverse=True)
+
+
+def _purpose_mismatch_transactions(txs: list[ImportedTransactionSample]) -> list[ImportedTransactionSample]:
+    keywords = (
+        "\u043b\u0438\u0447\u043d",
+        "\u0447\u0430\u0441\u0442\u043d",
+        "\u0431\u0435\u0437\u0432\u043e\u0437\u043c\u0435\u0437\u0434",
+        "\u0447\u0430\u0441\u0442\u043d\u043e\u0435 \u043b\u0438\u0446\u043e",
+        "personal",
+        "private",
+    )
+    suspicious = []
+    for tx in txs:
+        purpose = str(tx.purpose_text or "").strip().lower()
+        if not purpose:
+            continue
+        if not any(keyword in purpose for keyword in keywords):
+            continue
+        if _amount_abs(tx) < 200_000:
+            continue
+        suspicious.append(tx)
+    return suspicious

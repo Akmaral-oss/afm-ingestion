@@ -7,7 +7,7 @@ POST /api/v1/auth/register
 POST /api/v1/auth/logout
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -15,17 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db
-from ..email_service import generate_verification_code, send_registration_code
-from ..models import PendingRegistration, User
+from ..models import User
 from ..project_context import ensure_user_active_project
 from ..schemas import (
     ErrorResponse,
     LoginRequest,
     LoginResponse,
     MessageResponse,
-    RegisterConfirmRequest,
     RegisterRequest,
-    RegisterSendCodeRequest,
     UserOut,
 )
 from ..security import create_access_token, hash_password, verify_password
@@ -33,10 +30,6 @@ from app.exceptions import (
     UserALreadyExistsException, 
     IncorrectEmailOrPasswordException, 
     InvalidEmailException,
-    VerificationCodeExpiredException,
-    VerificationCodeNotRequestedException,
-    InvalidVerificationCodeException,
-    RegistrationFlowRequiredException,
     InvalidFieldException
 )
 
@@ -97,8 +90,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     return LoginResponse(token=token, user=_user_to_out(user))
 
 
-@router.post("/register/send-code", response_model=MessageResponse, responses={409: {"model": ErrorResponse}})
-async def register_send_code(body: RegisterSendCodeRequest, db: AsyncSession = Depends(get_db)):
+@router.post("/register", response_model=LoginResponse, responses={409: {"model": ErrorResponse}})
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     email = _normalize_email(body.email)
     password = _validate_secret_field(body.password, "password", min_length=6)
 
@@ -106,76 +99,17 @@ async def register_send_code(body: RegisterSendCodeRequest, db: AsyncSession = D
     if existing.scalar_one_or_none():
         raise UserALreadyExistsException
 
-    code = generate_verification_code()
-    now = _utc_now_naive()
-    expires_at = now + timedelta(minutes=settings.EMAIL_CODE_TTL_MINUTES)
     password_hash = hash_password(password)
-
-    pending_result = await db.execute(select(PendingRegistration).where(PendingRegistration.email == email))
-    pending = pending_result.scalar_one_or_none()
-    if pending:
-        pending.password_hash = password_hash
-        pending.verification_code = code
-        pending.expires_at = expires_at
-        pending.created_at = now
-    else:
-        db.add(
-            PendingRegistration(
-                email=email,
-                password_hash=password_hash,
-                verification_code=code,
-                expires_at=expires_at,
-                created_at=now,
-            )
-        )
-
-    send_registration_code(email, code)
-    await db.commit()
-    return MessageResponse(message="Verification code sent")
-
-
-@router.post(
-    "/register/confirm",
-    response_model=LoginResponse,
-    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
-)
-async def register_confirm(body: RegisterConfirmRequest, db: AsyncSession = Depends(get_db)):
-    email = _normalize_email(body.email)
-    code = _validate_secret_field(body.code, "verification code", min_length=4, max_length=6)
-
-    existing = await db.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none():
-        raise UserALreadyExistsException
-
-    pending_result = await db.execute(select(PendingRegistration).where(PendingRegistration.email == email))
-    pending = pending_result.scalar_one_or_none()
-    if not pending:
-        raise VerificationCodeNotRequestedException
-
-    now = _utc_now_naive()
-    if pending.expires_at < now:
-        await db.delete(pending)
-        await db.commit()
-        raise VerificationCodeExpiredException
-
-    if pending.verification_code != code:
-        raise InvalidVerificationCodeException
-
-    user = User(email=email, password_hash=pending.password_hash, role="user")
+    user = User(email=email, password_hash=password_hash, role="user")
+    
     db.add(user)
     await db.flush()
     await ensure_user_active_project(db, user)
-    await db.delete(pending)
     await db.commit()
     await db.refresh(user)
 
     token = create_access_token({"sub": str(user.id), "email": user.email, "role": user.role})
     return LoginResponse(token=token, user=_user_to_out(user))
-
-
-@router.post("/register", response_model=MessageResponse)
-async def register_legacy(_: RegisterRequest):
-    raise RegistrationFlowRequiredException
 
 
 @router.post("/logout", response_model=MessageResponse)

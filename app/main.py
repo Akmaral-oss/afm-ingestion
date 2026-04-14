@@ -30,6 +30,13 @@ async def lifespan(_: FastAPI):
         # 1. Ensure schema exists first
         await conn.execute(text("CREATE SCHEMA IF NOT EXISTS afm;"))
         
+        # 1b. Enable pgvector extension if not already active
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            print("INFO: pgvector extension enabled")
+        except Exception as e:
+            print(f"WARNING: Could not enable pgvector extension: {e}")
+        
         # 2. Map ORM models to tables
         await conn.run_sync(Base.metadata.create_all)
         

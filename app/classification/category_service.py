@@ -26,6 +26,8 @@ import numpy as np
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from app.ingestion.mapping.embedding_mapper import EmbeddingBackend
+
 from .rule_engine import (
     classify_by_rules,
     clean_purpose_text,
@@ -174,7 +176,7 @@ class CategoryService:
                 "cluster_id":         str(uuid.uuid4()),
                 "cluster_label":      name,
                 "cluster_keywords":   [w for w in name.lower().replace("/", " ").split() if len(w) > 2],
-                "centroid_embedding": _vec_to_pg(centroid),
+                "centroid_embedding": EmbeddingBackend.vec_to_pg_str(centroid),
                 "sample_texts":       self._fetch_samples(code),
                 "tx_count":           self._count_category(code),
             })
@@ -302,13 +304,9 @@ class CategoryService:
                     """), {"cat": cat_value}).fetchall()
                 vecs = []
                 for (raw,) in rows:
-                    if isinstance(raw, str):
-                        v = np.fromstring(raw.strip("[]"), sep=",", dtype=np.float32)
-                    elif isinstance(raw, (bytes, memoryview)):
-                        v = np.frombuffer(bytes(raw), dtype=np.float32)
-                    else:
-                        v = np.asarray(raw, dtype=np.float32)
-                    vecs.append(v)
+                    v = EmbeddingBackend.ensure_numpy(raw)
+                    if v.size > 0:
+                        vecs.append(v)
                 if vecs:
                     c   = np.vstack(vecs).mean(axis=0)
                     nrm = np.linalg.norm(c)
@@ -343,5 +341,4 @@ class CategoryService:
             return 0
 
 
-def _vec_to_pg(vec: np.ndarray) -> str:
-    return "[" + ",".join(f"{v:.6f}" for v in np.asarray(vec, dtype=np.float32).reshape(-1)) + "]"
+

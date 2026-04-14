@@ -30,9 +30,7 @@ AdapterDF = Union[pd.DataFrame, Tuple[pd.DataFrame, Dict[str, Any]]]
 _EMBED_BATCH_SIZE = 256
 
 
-def _vec_to_pg_literal(vec: np.ndarray) -> str:
-    arr = np.asarray(vec, dtype=np.float32).reshape(-1)
-    return "[" + ",".join(f"{value:.6f}" for value in arr) + "]"
+
 
 
 def _attach_embeddings(rows: List[Dict[str, Any]], embedder: EmbeddingBackend) -> None:
@@ -50,7 +48,7 @@ def _attach_embeddings(rows: List[Dict[str, Any]], embedder: EmbeddingBackend) -
         try:
             vectors = embedder.embed(batch_texts)
             for list_idx, vec in zip(batch_idx, vectors):
-                rows[list_idx]["semantic_embedding"] = _vec_to_pg_literal(vec)
+                rows[list_idx]["semantic_embedding"] = EmbeddingBackend.vec_to_pg_str(vec)
         except Exception:
             log.exception(
                 "Embedding batch %d-%d failed; semantic_embedding will be NULL",
