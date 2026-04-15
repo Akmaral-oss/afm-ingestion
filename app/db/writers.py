@@ -85,7 +85,7 @@ class PostgresWriter:
         source_bank: str,
         fp: str,
         header_sample: dict,
-        embedding_vector: bytes | None,
+        embedding_vector: str | list | None,
     ) -> None:
         payload = {
             "format_id": format_id,
@@ -105,7 +105,7 @@ class PostgresWriter:
                         :source_bank,
                         :fp,
                         CAST(:hs AS jsonb),
-                        :ev
+                        CAST(:ev AS vector)
                     )
                     ON CONFLICT (header_fingerprint) DO NOTHING;
                     """

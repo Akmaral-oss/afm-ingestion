@@ -25,14 +25,14 @@ class FormatRegistryService:
             self.writer.bump_format_usage(existing)
             return existing
 
-        emb_bytes: Optional[bytes] = None
+        emb_str: Optional[str] = None
 
         headers_norm = [norm_text(h) for h in headers if norm_text(h)]
 
         if self.embedder.enabled and headers_norm:
             header_text = " | ".join(headers_norm)
             vec = self.embedder.embed([header_text])[0]  # normalized vector
-            emb_bytes = EmbeddingBackend.vec_to_bytes(vec)
+            emb_str = EmbeddingBackend.vec_to_pg_str(vec)
 
             candidates = self.writer.load_format_vectors(
                 source_bank=source_bank
@@ -42,10 +42,12 @@ class FormatRegistryService:
             best_sim = -1.0
 
             for c in candidates:
-                b = c.get("embedding_vector")
-                if not b:
+                raw_v = c.get("embedding_vector")
+                if raw_v is None:
                     continue
-                v2 = EmbeddingBackend.bytes_to_vec(b)
+                v2 = EmbeddingBackend.ensure_numpy(raw_v)
+                if v2.size == 0:
+                    continue
                 sim = float(np.dot(vec, v2))  # cosine (normalized dot)
                 if sim > best_sim:
                     best_sim = sim
@@ -61,6 +63,6 @@ class FormatRegistryService:
             source_bank=source_bank,
             fp=fp,
             header_sample={"headers": headers_norm},
-            embedding_vector=emb_bytes,
+            embedding_vector=emb_str,
         )
         return new_id

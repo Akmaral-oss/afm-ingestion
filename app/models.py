@@ -10,6 +10,7 @@ from sqlalchemy import (
     BigInteger, SmallInteger, CHAR, Computed, text
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, BYTEA
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship, synonym
 from .database import Base
 
@@ -73,7 +74,7 @@ class FormatRegistry(Base):
     source_bank = Column(Text, nullable=True)
     header_fingerprint = Column(Text, nullable=True)
     header_sample = Column(JSONB, nullable=True)
-    embedding_vector = Column(BYTEA, nullable=True)
+    embedding_vector = Column(Vector(1024), nullable=True)
     first_seen = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_seen = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     usage_count = Column(Integer, nullable=False, server_default=text("1"))
@@ -182,8 +183,7 @@ class Transaction(Base):
     needs_review = Column(Boolean, nullable=False, server_default="false")
     
     semantic_text = Column(Text, nullable=True)
-    # We use BYTEA as fallback for vector if pgvector is not specifically configured as a type
-    semantic_embedding = Column(BYTEA, nullable=True)
+    semantic_embedding = Column(Vector(1024), nullable=True)
 
 
 class TransactionUploadMeta(Base):
@@ -236,7 +236,7 @@ class SemanticCatalog(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     type = Column(Text, nullable=False, server_default="tx")
     text = Column(Text, nullable=False)
-    embedding = Column(BYTEA, nullable=True) # vector(1024)
+    embedding = Column(Vector(1024), nullable=True)
     meta = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     # Extended fields from init_schema.sql
@@ -260,7 +260,7 @@ class QueryHistory(Base):
     generated_sql = Column(Text, nullable=True)
     execution_success = Column(Boolean, nullable=False, server_default="false")
     user_feedback = Column(SmallInteger, nullable=True)
-    embedding = Column(BYTEA, nullable=True) # vector(1024)
+    embedding = Column(Vector(1024), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     
     execution_time_ms = Column(Integer, nullable=True)

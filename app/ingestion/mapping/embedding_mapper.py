@@ -143,8 +143,29 @@ class EmbeddingBackend:
         return v.tobytes(order="C")
 
     @staticmethod
+    def vec_to_pg_str(vec: np.ndarray) -> str:
+        """Convert numpy array to pgvector literal string '[0.1, 0.2, ...]'."""
+        arr = np.asarray(vec, dtype=np.float32).reshape(-1)
+        return "[" + ",".join(f"{v:.6f}" for v in arr) + "]"
+
+    @staticmethod
     def bytes_to_vec(b: bytes) -> np.ndarray:
         return np.frombuffer(b, dtype=np.float32)
+
+    @staticmethod
+    def ensure_numpy(v: Any) -> np.ndarray:
+        """Helper to ensure we have a numpy array whether input is bytes, list, or array."""
+        if v is None:
+            return np.array([], dtype=np.float32)
+        if isinstance(v, bytes):
+            return EmbeddingBackend.bytes_to_vec(v)
+        if isinstance(v, str):
+            # Handle '[0.1, 0.2]' format
+            s = v.strip("[]")
+            if not s:
+                return np.array([], dtype=np.float32)
+            return np.fromstring(s, sep=",", dtype=np.float32)
+        return np.asarray(v, dtype=np.float32)
 
     def _zero_embeddings(self, count: int) -> np.ndarray:
         width = int(self.dim or 1)
