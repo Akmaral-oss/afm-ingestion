@@ -164,6 +164,22 @@ def _normalized_account_expr(account_col):
     return base
 
 
+def _valid_name_expr(name_col):
+    trimmed_name = func.trim(name_col)
+    invalid_name = func.lower(func.coalesce(trimmed_name, "")).in_(
+        ["nan", "none", "null", "nat", "<na>", "n/a", "unknown"]
+    )
+    return and_(trimmed_name.isnot(None), trimmed_name != "", ~invalid_name)
+
+
+def _normalized_name_sql_expr(name_col):
+    normalized = func.lower(func.trim(func.coalesce(name_col, "")))
+    normalized = func.replace(normalized, '"', "")
+    normalized = func.replace(normalized, "'", "")
+    normalized = func.regexp_replace(normalized, r"\s+", " ", "g")
+    return normalized
+
+
 def _counterparty_key(iin_bin: Optional[str], account: Optional[str], display_name: Optional[str]) -> str:
     iin = _normalize_iin(iin_bin or "")
     acc = _normalize_account(account or "")
@@ -172,9 +188,13 @@ def _counterparty_key(iin_bin: Optional[str], account: Optional[str], display_na
     # Prefer IIN/BIN as stable person/company identifier regardless of account.
     if iin and iin not in {"000000000000", "0"}:
         return f"iin:{iin}"
+    # If IIN/BIN is missing, the same person often appears with several accounts.
+    # Group by normalized display name first to avoid duplicated agents in top lists.
+    if name:
+        return f"name:{name}"
     if acc:
         return f"acc:{acc}"
-    return f"name:{name}"
+    return "name:"
 
 
 def _pick_better_display_name(current: str, candidate: str) -> str:
@@ -1126,27 +1146,31 @@ async def top_counterparties(
     sender_display = _display_name_expr(Transaction.sender_name, Transaction.sender_account)
     sender_iin = func.upper(func.coalesce(Transaction.sender_iin_bin, ""))
     sender_acc = _normalized_account_expr(Transaction.sender_account)
+    sender_has_name = _valid_name_expr(Transaction.sender_name)
     sender_has_iin = and_(sender_iin != "", sender_iin != "0", sender_iin != "000000000000")
     sender_has_acc = sender_acc != ""
     sender_key = case(
         (sender_has_iin, literal("iin:") + sender_iin),
+        (sender_has_name, literal("name:") + _normalized_name_sql_expr(Transaction.sender_name)),
         (sender_has_acc, literal("acc:") + sender_acc),
         else_=literal("name:") + sender_display,
     )
-    sender_account_out = case((sender_has_iin, literal("")), else_=sender_acc)
+    sender_account_out = case((or_(sender_has_iin, sender_has_name), literal("")), else_=sender_acc)
     sender_iin_out = case((sender_has_iin, sender_iin), else_=literal(""))
 
     recipient_display = _display_name_expr(Transaction.recipient_name, Transaction.recipient_account)
     recipient_iin = func.upper(func.coalesce(Transaction.recipient_iin_bin, ""))
     recipient_acc = _normalized_account_expr(Transaction.recipient_account)
+    recipient_has_name = _valid_name_expr(Transaction.recipient_name)
     recipient_has_iin = and_(recipient_iin != "", recipient_iin != "0", recipient_iin != "000000000000")
     recipient_has_acc = recipient_acc != ""
     recipient_key = case(
         (recipient_has_iin, literal("iin:") + recipient_iin),
+        (recipient_has_name, literal("name:") + _normalized_name_sql_expr(Transaction.recipient_name)),
         (recipient_has_acc, literal("acc:") + recipient_acc),
         else_=literal("name:") + recipient_display,
     )
-    recipient_account_out = case((recipient_has_iin, literal("")), else_=recipient_acc)
+    recipient_account_out = case((or_(recipient_has_iin, recipient_has_name), literal("")), else_=recipient_acc)
     recipient_iin_out = case((recipient_has_iin, recipient_iin), else_=literal(""))
 
     sender_side = (
@@ -1165,7 +1189,7 @@ async def top_counterparties(
                 ctx.project.project_id,
                 sender_display.isnot(None),
                 sender_display != "",
-                or_(sender_has_iin, sender_has_acc),
+                or_(sender_has_iin, sender_has_name, sender_has_acc),
                 *shared_conds,
             )
         )
@@ -1188,7 +1212,7 @@ async def top_counterparties(
                 ctx.project.project_id,
                 recipient_display.isnot(None),
                 recipient_display != "",
-                or_(recipient_has_iin, recipient_has_acc),
+                or_(recipient_has_iin, recipient_has_name, recipient_has_acc),
                 *shared_conds,
             )
         )
@@ -1479,7 +1503,7 @@ async def cash_top(
         .where(base_cond)
         .group_by(display_name, group_iin, group_acc)
         .order_by(func.sum(amount_col).desc())
-        .limit(limit)
+        .limit(limit * 5)
     )
 
     rows = (await db.execute(q)).all()
