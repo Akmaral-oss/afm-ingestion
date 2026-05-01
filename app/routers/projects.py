@@ -132,6 +132,10 @@ async def delete_project(
         {"project_id": project_id},
     )
     await db.execute(
+        text("DELETE FROM afm.esf_records WHERE project_id = CAST(:project_id AS uuid)"),
+        {"project_id": project_id},
+    )
+    await db.execute(
         text("DELETE FROM afm.transactions_core WHERE project_id = CAST(:project_id AS uuid)"),
         {"project_id": project_id},
     )

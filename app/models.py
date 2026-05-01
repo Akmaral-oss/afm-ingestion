@@ -208,6 +208,77 @@ class TransactionExt(Base):
     ext_json = Column(JSONB, nullable=False)
 
 
+class EsfRecord(Base):
+    __tablename__ = "esf_records"
+    __table_args__ = (
+        Index("idx_esf_project_issue_date", "project_id", "issue_date"),
+        Index("idx_esf_project_turnover_date", "project_id", "turnover_date"),
+        Index("idx_esf_project_supplier_iin", "project_id", "supplier_iin_bin"),
+        Index("idx_esf_project_buyer_iin", "project_id", "buyer_iin_bin"),
+        Index("idx_esf_project_status", "project_id", "esf_status"),
+        Index("uq_esf_project_rowhash_idx", "project_id", "row_hash", unique=True),
+        {"schema": "afm"},
+    )
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(UUID(as_uuid=False), ForeignKey("afm.projects.project_id"), nullable=True)
+    file_id = Column(UUID(as_uuid=False), ForeignKey("afm.raw_files.file_id"), nullable=True)
+    source_sheet = Column(Text, nullable=True)
+    source_row_no = Column(Integer, nullable=True)
+    row_hash = Column(Text, nullable=False)
+    esf_direction = Column(Text, nullable=False, server_default="sale")
+
+    registration_number = Column(Text, nullable=False)
+    tax_authority_code = Column(Text, nullable=True)
+    esf_status = Column(Text, nullable=True)
+    issue_date = Column(DateTime(timezone=True), nullable=True)
+    turnover_date = Column(DateTime(timezone=True), nullable=True)
+    year = Column(Integer, nullable=True)
+
+    supplier_iin_bin = Column(CHAR(12), nullable=True)
+    supplier_name = Column(Text, nullable=True)
+    supplier_address = Column(Text, nullable=True)
+
+    buyer_iin_bin = Column(CHAR(12), nullable=True)
+    buyer_name = Column(Text, nullable=True)
+    buyer_address = Column(Text, nullable=True)
+
+    country_code = Column(Text, nullable=True)
+
+    consignor_iin_bin = Column(CHAR(12), nullable=True)
+    consignor_name = Column(Text, nullable=True)
+    ship_from_address = Column(Text, nullable=True)
+
+    consignee_iin_bin = Column(CHAR(12), nullable=True)
+    consignee_name = Column(Text, nullable=True)
+    delivery_address = Column(Text, nullable=True)
+
+    contract_number = Column(Text, nullable=True)
+    contract_date = Column(DateTime(timezone=True), nullable=True)
+    payment_terms = Column(Text, nullable=True)
+    destination = Column(Text, nullable=True)
+
+    origin_sign = Column(Text, nullable=True)
+    tru_name = Column(Text, nullable=True)
+    tnved_code = Column(Text, nullable=True)
+    unit = Column(Text, nullable=True)
+    quantity = Column(Numeric(18, 4), nullable=True)
+    price_without_vat = Column(Numeric(18, 2), nullable=True)
+    price_with_vat = Column(Numeric(18, 2), nullable=True)
+    cost_without_indirect_tax = Column(Numeric(18, 2), nullable=True)
+    turnover_amount = Column(Numeric(18, 2), nullable=True)
+    vat_rate = Column(Numeric(10, 4), nullable=True)
+    vat_amount = Column(Numeric(18, 2), nullable=True)
+    cost_with_indirect_tax = Column(Numeric(18, 2), nullable=True)
+    total_amount = Column(Numeric(18, 2), nullable=True)
+    currency_rate = Column(Numeric(18, 6), nullable=True)
+    currency_code = Column(Text, nullable=True)
+    currency_name_ru = Column(Text, nullable=True)
+
+    raw_row_json = Column(JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class FieldDiscoveryLog(Base):
     __tablename__ = "field_discovery_log"
     __table_args__ = ({"schema": "afm"},)

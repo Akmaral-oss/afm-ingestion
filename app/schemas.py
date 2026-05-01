@@ -136,6 +136,12 @@ class ImportFraudTransactionOut(BaseModel):
     amount: str
     counterparty: str
     purpose: str
+    sender_name: str = ""
+    sender_iin_bin: str = ""
+    sender_account: str = ""
+    recipient_name: str = ""
+    recipient_iin_bin: str = ""
+    recipient_account: str = ""
 
 
 class ImportFraudWarningOut(BaseModel):
@@ -154,6 +160,54 @@ class TransactionImportResponse(BaseModel):
     skipped: int
     message: str
     fraud_warnings: list[ImportFraudWarningOut] = Field(default_factory=list)
+
+
+class EsfCounterpartyOut(BaseModel):
+    name: str
+    iin_bin: str
+    address: str = ""
+
+
+class EsfRecordOut(BaseModel):
+    id: str
+    registration_number: str
+    esf_status: str = ""
+    esf_direction: str = ""
+    issue_date: str = ""
+    turnover_date: str = ""
+    supplier: EsfCounterpartyOut
+    buyer: EsfCounterpartyOut
+    tru_name: str = ""
+    quantity: float = 0
+    unit: str = ""
+    vat_rate: float = 0
+    price_without_vat: float = 0
+    price_with_vat: float = 0
+    total_amount: float = 0
+    vat_amount: float = 0
+    currency_code: str = ""
+    contract_number: str = ""
+
+
+class EsfSummaryOut(BaseModel):
+    total_records: int
+    total_amount: float
+    total_vat: float
+    sales_amount: float
+    purchase_amount: float
+
+
+class EsfListResponse(BaseModel):
+    data: list[EsfRecordOut]
+    pagination: PaginationOut
+    summary: EsfSummaryOut
+
+
+class EsfSheetResponse(BaseModel):
+    data: list[dict[str, Any]]
+    pagination: PaginationOut
+    summary: EsfSummaryOut
+    years: list[int] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

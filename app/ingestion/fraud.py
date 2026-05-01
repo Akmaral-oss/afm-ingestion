@@ -31,6 +31,12 @@ class ImportFraudTransaction:
     amount: str
     counterparty: str
     purpose: str
+    sender_name: str = ""
+    sender_iin_bin: str = ""
+    sender_account: str = ""
+    recipient_name: str = ""
+    recipient_iin_bin: str = ""
+    recipient_account: str = ""
 
 
 @dataclass(frozen=True)
@@ -519,6 +525,12 @@ def _sample_transactions(
             amount=_format_money(_credit_amount(tx) or _debit_amount(tx) or tx.amount_kzt),
             counterparty=_counterparty_label(tx, payer=_credit_amount(tx) > 0),
             purpose=_truncate_text((tx.purpose_text or tx.operation_type_raw or tx.transaction_category or "").strip(), 120),
+            sender_name=str(tx.payer_name or "").strip(),
+            sender_iin_bin=str(tx.payer_iin_bin or "").strip(),
+            sender_account=str(tx.payer_account or "").strip(),
+            recipient_name=str(tx.receiver_name or "").strip(),
+            recipient_iin_bin=str(tx.receiver_iin_bin or "").strip(),
+            recipient_account=str(tx.receiver_account or "").strip(),
         )
         for tx in ordered
     ]

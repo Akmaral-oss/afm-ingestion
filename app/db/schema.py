@@ -249,3 +249,67 @@ def ensure_schema(engine: Engine) -> None:
         """,
             label="backfill users.active_project_id",
         )
+        _execute_optional(
+            conn,
+            """
+        INSERT INTO afm.transactions_core (
+          tx_id, file_id, statement_id, format_id, project_id,
+          source_bank, source_sheet, source_block_id, source_row_no, row_hash,
+          operation_ts, operation_date, currency, amount_currency, amount_kzt,
+          amount_credit, amount_debit, direction, operation_type_raw, sdp_name,
+          purpose_code, purpose_text, raw_note, payer_name, payer_iin_bin,
+          payer_residency, payer_bank, payer_account, receiver_name, receiver_iin_bin,
+          receiver_residency, receiver_bank, receiver_account, confidence_score, parse_warnings,
+          raw_row_json, transaction_category, category_confidence, category_source, category_rule_id,
+          needs_review, semantic_text
+        )
+        SELECT
+          er.id,
+          er.file_id,
+          NULL,
+          NULL,
+          er.project_id,
+          'esf',
+          er.source_sheet,
+          NULL,
+          er.source_row_no,
+          'esf-shadow:' || er.row_hash,
+          COALESCE(er.turnover_date, er.issue_date),
+          CAST(COALESCE(er.turnover_date, er.issue_date) AS date),
+          COALESCE(NULLIF(er.currency_code, ''), 'KZT'),
+          er.total_amount,
+          er.total_amount,
+          CASE WHEN er.esf_direction = 'purchase' THEN 0 ELSE er.total_amount END,
+          CASE WHEN er.esf_direction = 'purchase' THEN er.total_amount ELSE 0 END,
+          CASE WHEN er.esf_direction = 'purchase' THEN 'debit' ELSE 'credit' END,
+          CONCAT('ЭСФ ', COALESCE(er.esf_status, '')),
+          'ЭСФ',
+          NULL,
+          CONCAT_WS(' | ', NULLIF(er.tru_name, ''), NULLIF(er.registration_number, ''), NULLIF(er.contract_number, '')),
+          er.contract_number,
+          er.supplier_name,
+          er.supplier_iin_bin,
+          er.supplier_address,
+          NULL,
+          '',
+          er.buyer_name,
+          er.buyer_iin_bin,
+          er.buyer_address,
+          NULL,
+          '',
+          1.0,
+          NULL,
+          er.raw_row_json,
+          CASE WHEN er.esf_direction = 'purchase' THEN 'Приобретение' ELSE 'Реализация' END,
+          NULL,
+          'esf',
+          NULL,
+          false,
+          CONCAT_WS(' | ', 'esf', COALESCE(er.esf_status, ''), COALESCE(er.registration_number, ''), COALESCE(er.tru_name, ''), COALESCE(er.supplier_name, ''), COALESCE(er.buyer_name, ''), COALESCE(er.contract_number, ''))
+        FROM afm.esf_records er
+        WHERE NOT EXISTS (
+          SELECT 1 FROM afm.transactions_core tc WHERE tc.tx_id = er.id
+        );
+        """,
+            label="backfill esf shadow transactions",
+        )
