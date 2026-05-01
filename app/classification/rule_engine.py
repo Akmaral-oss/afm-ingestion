@@ -28,6 +28,7 @@ CAT_STATE      = "STATE_PAYMENT"
 CAT_SALARY     = "SALARY"
 CAT_TOPUP      = "ACCOUNT_TOPUP"
 CAT_CASH_TOPUP = "CASH_TOPUP"
+CAT_DEPOSIT    = "DEPOSIT"
 CAT_CONTRACT   = "CONTRACT_SETTLEMENT"
 CAT_INVOICE    = "INVOICE_PAYMENT"
 CAT_CARD       = "CARD_PAYMENT"
@@ -50,6 +51,7 @@ CATEGORY_NAMES: dict[str, str] = {
     CAT_SALARY:     "Зарплата",
     CAT_TOPUP:      "Пополнение счёта",
     CAT_CONTRACT:   "Расчёты по договору",
+    CAT_DEPOSIT:    "Депозит",
     CAT_INVOICE:    "Оплата по счёт-фактуре",
     CAT_CARD:       "Платёж на карту",
     CAT_FX:         "Валютная операция",
@@ -77,6 +79,16 @@ def _r(rule_id: str, cat: str, pri: int, pat: str, conf: float = 0.95) -> Rule:
 
 
 _RULES: List[Rule] = [
+
+    # Project-specific bank statement mappings to reduce "Прочее".
+    _r("USR_DEP_FEE_01", CAT_DEPOSIT, 215, r"ведение\s+вкладного\s+сч[её]та|ндс\s+не\s+облагается.{0,80}вклад|согласно\s+тарифов?.{0,40}вклад"),
+    _r("USR_DEP_INCOME_01", CAT_DEPOSIT, 214, r"взнос\s+во\s+вклад|плат[её]ж\s+на\s+deposit|плат[её]ж\s+о\s+deposit|досрочное\s+расторжение\s+по\s+вкладу|deposit\s+branch"),
+    _r("USR_INTERNAL_01", CAT_INTERNAL, 214, r"комисси[яи]\s+за\s+перевод\s+в\s+тенге|переводы?\s+клиентом\s+денег\s+со\s+своего\s+текущего\s+сч[её]та.{0,80}на\s+свой\s+текущий\s+сч[её]т|удержание\s+суммы\s+ранее\s+выплаченного\s+вознаграждения|cardfeemonthly"),
+    _r("USR_INTERNAL_02", CAT_INTERNAL, 213, r"со\s+своего\s+текущего\s+сч[её]та\s+в\s+одном\s+банке\s+на\s+свой\s+текущий\s+сч[её]т\s+в\s+другом\s+банке"),
+    _r("USR_P2P_01", CAT_P2P, 214, r"перевод\s+с\s+текущего\s+сч[её]та\s+с\s+использованием\s+перевода\s+с\s+текущего\s+сч[её]та\s+на\s+чужой\s+карточный\s+сч[её]т|перевод\s+в\s+ббу"),
+    _r("USR_CASH_01", CAT_CASH, 214, r"выдано\s+со\s+сч[её]та\s+клиента|снятие\s+с\s+долгосрочного\s+вклада|cash\s+dispense|cash\s+auto\s+kassa|cash\s+tcbo"),
+    _r("USR_FX_01", CAT_FX, 214, r"за\s+проданные\s+по\s+курсу"),
+    _r("USR_TOPUP_01", CAT_TOPUP, 214, r"soa_credit\s+popolnenie\s+kartochnogo\s+scheta\s+cherez\s+platezhnyi\s+terminal"),
 
     _r("HALYK_RETAIL_01", CAT_STORE, 205, r"\bretail\b"),
     _r("HALYK_CH_PAYMENT_01", CAT_CARD, 204, r"\bch\s*payment\b"),
