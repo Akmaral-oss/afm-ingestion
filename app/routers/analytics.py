@@ -8,6 +8,7 @@ Analytics endpoints:
 
 from datetime import datetime
 from typing import Optional
+import networkx as nx
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_, or_, case, literal, literal_column, cast, DateTime, Date, union_all
@@ -2055,3 +2056,167 @@ async def counterparty_graph(
         nodes=nodes,
         edges=edges,
     )
+
+
+@router.get("/global-graph", response_model=CounterpartyGraphResponse)
+async def global_graph(
+    date: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    currency: Optional[str] = Query(None),
+    sender: Optional[str] = Query(None),
+    recipient: Optional[str] = Query(None),
+    limit_nodes: int = Query(200, ge=10, le=1000),
+    ctx: ProjectContext = Depends(get_current_project_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns a global graph of transactions for the project,
+    limited to the top N counterparties by turnover to ensure performance.
+    """
+    conds = _shared_filter_conditions(
+        date=date,
+        date_from=date_from,
+        date_to=date_to,
+        category=category,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        currency=currency,
+        sender=sender,
+        recipient=recipient,
+    )
+    where = _project_where(ctx.project.project_id, *conds)
+
+    # 1. Identify top counterparties by absolute turnover
+    in_q = (
+        select(Transaction.recipient_iin_bin.label("iin"), func.sum(Transaction.amount_tenge).label("turnover"))
+        .where(where)
+        .group_by(Transaction.recipient_iin_bin)
+    )
+    out_q = (
+        select(Transaction.sender_iin_bin.label("iin"), func.sum(Transaction.amount_tenge).label("turnover"))
+        .where(where)
+        .group_by(Transaction.sender_iin_bin)
+    )
+    
+    # Combined turnover query
+    combined = union_all(in_q, out_q).alias("combined_t")
+    top_nodes_q = (
+        select(combined.c.iin, func.sum(combined.c.turnover).label("total"))
+        .group_by(combined.c.iin)
+        .order_by(func.sum(combined.c.turnover).desc())
+        .limit(limit_nodes)
+    )
+    
+    top_rows = (await db.execute(top_nodes_q)).all()
+    top_iins = {r.iin for r in top_rows if r.iin and not _is_invalid_iin(r.iin)}
+    
+    if not top_iins:
+        return CounterpartyGraphResponse(center_iin_bin="", nodes=[], edges=[])
+
+    # 2. Extract edges between these nodes
+    edges_q = (
+        select(
+            Transaction.sender_iin_bin,
+            Transaction.sender_name,
+            Transaction.sender_account,
+            Transaction.recipient_iin_bin,
+            Transaction.recipient_name,
+            Transaction.recipient_account,
+            func.sum(Transaction.amount_tenge).label("amount"),
+            func.count(Transaction.id).label("tx_count"),
+        )
+        .where(and_(
+            where,
+            Transaction.sender_iin_bin.in_(top_iins),
+            Transaction.recipient_iin_bin.in_(top_iins),
+            Transaction.sender_iin_bin != Transaction.recipient_iin_bin
+        ))
+        .group_by(
+            Transaction.sender_iin_bin,
+            Transaction.sender_name,
+            Transaction.sender_account,
+            Transaction.recipient_iin_bin,
+            Transaction.recipient_name,
+            Transaction.recipient_account,
+        )
+    )
+    
+    edge_rows = (await db.execute(edges_q)).all()
+    
+    # 3. Build response and calculate communities
+    node_meta: dict[str, dict] = {}
+    edges_map: dict[tuple[str, str], dict] = {}
+    
+    # Build Nx graph for community/group detection
+    nx_g = nx.Graph()
+    nx_g.add_nodes_from(top_iins)
+    
+    for r in edge_rows:
+        s_iin = _normalize_iin(r.sender_iin_bin)
+        r_iin = _normalize_iin(r.recipient_iin_bin)
+        
+        # Add source node
+        if s_iin not in node_meta:
+            node_meta[s_iin] = {"label": _resolve_display_name(r.sender_name, r.sender_account) or s_iin, "turnover": 0.0}
+        
+        # Add target node
+        if r_iin not in node_meta:
+            node_meta[r_iin] = {"label": _resolve_display_name(r.recipient_name, r.recipient_account) or r_iin, "turnover": 0.0}
+            
+        # Update turnover
+        amount = float(r.amount or 0)
+        node_meta[s_iin]["turnover"] += amount
+        node_meta[r_iin]["turnover"] += amount
+        
+        # Add edge to Nx graph
+        nx_g.add_edge(s_iin, r_iin)
+        
+        # Add edge to response map
+        edge_key = tuple(sorted((s_iin, r_iin)))
+        if edge_key not in edges_map:
+            edges_map[edge_key] = {"source": s_iin, "target": r_iin, "amount": 0.0, "tx_count": 0}
+        edges_map[edge_key]["amount"] += amount
+        edges_map[edge_key]["tx_count"] += int(r.tx_count or 0)
+
+    # Calculate connected components as "groups"
+    communities = list(nx.connected_components(nx_g))
+    node_to_community = {}
+    for i, comm in enumerate(communities):
+        for node_id in comm:
+            node_to_community[node_id] = i
+    
+    final_nodes = [
+        CounterpartyGraphNode(
+            id=iin,
+            label=_fix_mojibake(meta["label"]),
+            iin_bin=iin,
+            level=0, 
+            total_turnover=meta["turnover"],
+            community_id=node_to_community.get(iin, 0)
+        )
+        for iin, meta in node_meta.items()
+    ]
+    
+    final_edges = [
+        CounterpartyGraphEdge(
+            source=meta["source"],
+            target=meta["target"],
+            amount=meta["amount"],
+            tx_count=meta["tx_count"]
+        )
+        for meta in edges_map.values()
+    ]
+    
+    return CounterpartyGraphResponse(
+        center_iin_bin="", 
+        nodes=final_nodes,
+        edges=final_edges
+    )
+
+

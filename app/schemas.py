@@ -334,6 +334,7 @@ class CounterpartyGraphNode(BaseModel):
     iin_bin: str
     level: int
     total_turnover: float
+    community_id: Optional[int] = None
 
 
 class CounterpartyGraphEdge(BaseModel):
